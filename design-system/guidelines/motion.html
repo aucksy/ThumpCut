@@ -1,0 +1,19 @@
+<!-- @dsCard group="Motion" viewport="700x190" subtitle="Everything springs, cuts are hard, reduced motion is designed" name="Motion rules" -->
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+body{margin:0;background:var(--tc-graphite);font-family:var(--font-body);color:var(--tc-bone);display:flex;align-items:center;gap:32px;padding:24px 32px;box-sizing:border-box;height:190px}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--tc-signal);animation:tc-beat 1.875s infinite}
+ul{margin:0;padding:0;list-style:none;font-size:12.5px;line-height:1.7;color:var(--tc-bone-70)}
+code{font-family:var(--font-data);font-size:11px;color:var(--tc-bone-55)}
+</style>
+</head><body>
+<div style="display:flex;flex-direction:column;align-items:center;gap:10px"><div class="dot tc-anim-beat"></div><code>tc-beat @ 128 BPM</code></div>
+<ul>
+  <li>Springs only — <code>--spring: cubic-bezier(.3,1.4,.4,1)</code>, never linear</li>
+  <li>Preview cuts are hard, on the frame. The UI never crossfades itself.</li>
+  <li>Ruler marker pulse: <code>120ms</code>, scale only. Card entry stagger <code>80ms</code>.</li>
+  <li>Reduced motion: autoplay and pulses off, playhead stays.</li>
+  <li>No parallax, no glassmorphism, no shimmer.</li>
+</ul>
+</body></html>

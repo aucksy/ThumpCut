@@ -1,0 +1,98 @@
+import type { ExpoConfig } from "expo/config";
+
+/**
+ * ThumpCut's Expo configuration.
+ *
+ * Three entries here are not cosmetic and the app silently misbehaves without them:
+ *
+ *   · `LSApplicationQueriesSchemes` must list `instagram-reels`, or `canOpenURL` returns false
+ *     for ever and the share button never appears on iOS. There is a test asserting it.
+ *   · The Android FileProvider authority must match what the share module builds its content
+ *     URI from, or the handoff throws on every modern Android.
+ *   · New Architecture is on by default from React Native 0.82 — there is no flag to set
+ *     and no way to turn it off, so there is nothing here to configure.
+ */
+
+const META_APP_ID = process.env.EXPO_PUBLIC_META_APP_ID ?? "";
+
+const config: ExpoConfig = {
+  name: "ThumpCut",
+  slug: "thumpcut",
+  version: "1.0.0",
+  orientation: "portrait",
+  scheme: "thumpcut",
+  userInterfaceStyle: "dark",
+  backgroundColor: "#17181A",
+
+  splash: {
+    backgroundColor: "#17181A",
+    resizeMode: "contain",
+  },
+
+  ios: {
+    bundleIdentifier: "com.thumpcut.app",
+    supportsTablet: false,
+    buildNumber: "1",
+    infoPlist: {
+      // Without this the Instagram button never appears, and nothing errors.
+      LSApplicationQueriesSchemes: ["instagram-reels", "instagram"],
+      NSPhotoLibraryUsageDescription:
+        "ThumpCut needs access to your photos to make a reel.",
+      NSPhotoLibraryAddUsageDescription:
+        "ThumpCut saves your finished reel to your gallery.",
+      UIViewControllerBasedStatusBarAppearance: false,
+    },
+  },
+
+  android: {
+    package: "com.thumpcut.app",
+    versionCode: 1,
+    permissions: [
+      "android.permission.READ_MEDIA_IMAGES",
+      "android.permission.READ_MEDIA_VIDEO",
+      // Android 13 and below. Newer versions use the two above.
+      "android.permission.READ_EXTERNAL_STORAGE",
+    ],
+    adaptiveIcon: {
+      backgroundColor: "#17181A",
+    },
+  },
+
+  plugins: [
+    "expo-router",
+    [
+      "expo-image-picker",
+      { photosPermission: "ThumpCut needs access to your photos to make a reel." },
+    ],
+    [
+      "expo-media-library",
+      {
+        photosPermission: "ThumpCut needs access to your photos to make a reel.",
+        savePhotosPermission: "ThumpCut saves your finished reel to your gallery.",
+        isAccessMediaLocationEnabled: false,
+      },
+    ],
+    [
+      "expo-build-properties",
+      {
+        android: {
+          // Media3 Transformer, which the renderer composes the timeline with.
+          minSdkVersion: 24,
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
+        },
+        ios: { deploymentTarget: "15.1" },
+      },
+    ],
+  ],
+
+  extra: {
+    metaAppId: META_APP_ID,
+    catalogueUrl: process.env.EXPO_PUBLIC_CATALOGUE_URL ?? "",
+    eas: { projectId: process.env.EAS_PROJECT_ID ?? "" },
+  },
+
+  experiments: { typedRoutes: true },
+};
+
+export default config;

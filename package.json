@@ -1,0 +1,27 @@
+{
+  "name": "thumpcut",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "app",
+    "tools/ui-verify"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p packages/design-tokens --pretty false && tsc -p packages/cut-engine --pretty false && tsc -p app --pretty false",
+    "test": "npm run test --workspaces --if-present",
+    "test:engine": "npm run test -w @thumpcut/cut-engine",
+    "test:app": "npm run test -w thumpcut-app",
+    "verify:ui": "npm run verify -w @thumpcut/ui-verify",
+    "verify:ui:screens": "npm run screens -w @thumpcut/ui-verify",
+    "verify": "npm run typecheck && npm test && npm run verify:ui",
+    "factory": "python -m factory.run",
+    "factory:test": "python -m pytest factory/tests -q"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

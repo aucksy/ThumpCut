@@ -1,0 +1,45 @@
+<!-- @dsCard group="Components" viewport="700x640" subtitle="Media tiles, template cards, clip trim sheet" name="Media" -->
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="../../tc-loader.js"></script>
+<style>body{margin:0;background:var(--tc-graphite);padding:22px 26px;box-sizing:border-box;font-family:var(--font-body)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+TCLoad('../..', ['components/ruler/BeatRuler.jsx','components/actions/Button.jsx','components/media/MediaTile.jsx','components/media/TemplateCard.jsx','components/media/TrimSheet.jsx']).then(({MediaTile, TemplateCard, TrimSheet}) => {
+  const P = (s) => 'https://picsum.photos/seed/' + s + '/300/300';
+  const Cap = ({children}) => <div className="tc-label" style={{fontSize:10,marginBottom:8}}>{children}</div>;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <div style={{display:'flex',flexDirection:'column',gap:20}}>
+      <div>
+        <Cap>Media tile — photo · photo selected · video · video selected · dimmed at cap · unavailable</Cap>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          <MediaTile src={P('tcp1')} size={96}/>
+          <MediaTile src={P('tcp2')} size={96} selected order={1}/>
+          <MediaTile src={P('tcv1')} size={96} type="video" duration="0:12"/>
+          <MediaTile src={P('tcv2')} size={96} type="video" duration="0:07" selected order={2}/>
+          <MediaTile src={P('tcv3')} size={96} type="video" duration="0:21" dimmed/>
+          <MediaTile src={P('tcp3')} size={96} unavailable/>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:20,alignItems:'flex-start'}}>
+        <div>
+          <Cap>Template card — cached · still frame · selected</Cap>
+          <div style={{display:'flex',gap:12}}>
+            <TemplateCard width={140} name="Night drive" src={'https://picsum.photos/seed/tpl1/270/360'} seed={2}/>
+            <TemplateCard width={140} name="Golden hour" bpm={96} items="6–12" still src={'https://picsum.photos/seed/tpl2/270/360'} seed={5}/>
+            <TemplateCard width={140} name="Heat" bpm={140} items="10–20" selected src={'https://picsum.photos/seed/tpl3/270/360'} seed={7}/>
+          </div>
+        </div>
+        <div>
+          <Cap>Clip trim sheet</Cap>
+          <TrimSheet width={300} clipSrc={'https://picsum.photos/seed/tcv1/600/340'} style={{borderRadius:'var(--r-card)'}}/>
+        </div>
+      </div>
+    </div>
+  );
+});
+</script>
+</body></html>

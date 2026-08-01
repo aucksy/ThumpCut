@@ -1,0 +1,41 @@
+# Decisions log
+
+Append every non-obvious decision here, newest at the bottom, with a one-line reason.
+Claude reads this at the start of every session so past reasoning is not lost or relitigated.
+
+Format: `YYYY-MM-DD — decision — reason`
+
+---
+
+2026-07-27 — Music is never hosted or licensed; Instagram supplies the track after handoff — no self-serve licensing route exists for an indie, and the handoff removes the need entirely.
+2026-07-27 — Export is silent, with no audio track at all — embedding audio to trigger Instagram's fingerprint match is unlicensed synchronisation and the largest legal exposure in the product.
+2026-07-27 — Beat detection runs offline in the Factory, never on device — higher accuracy, and it keeps GPL and non-commercial licensed libraries out of the app bundle.
+2026-07-27 — Beat This! runs with dbn=False — the --dbn flag pulls in madmom, whose model weights are Creative Commons Non-Commercial.
+2026-07-27 — No database; static JSON on Cloudflare R2 — the workload is a read-only list of ~300 items, and R2 has no egress fees.
+2026-07-27 — Video clips are a first-class input, not photos-that-move — this is the product's differentiator against template-and-photo competitors.
+2026-07-27 — Ken Burns applies to photos only — a clip already has motion, and synthetic zoom on top of it looks wrong.
+2026-07-27 — Cut engine is a pure package with zero dependencies — it is the core of the product and must be verifiable without a device.
+2026-07-27 — No accounts and no analytics in the MVP — each one creates data-protection duties and Play Store obligations that buy nothing yet.
+2026-07-27 — Android ships first on a cross-platform codebase — no store review cycle between iterations, and it matches the available test devices.
+2026-07-27 — Factory audio comes from Meta's Instagram Audio API download_url, not iTunes — the beat grid must be computed from the same recording Instagram attaches, or sync breaks silently; iTunes previews also start at an unknown offset and their terms forbid syncing with video.
+2026-07-27 — Beat maps store audioFingerprint, sourceDurationMs and lastVerifiedAt — Instagram can swap a recording for a remaster with no error surfacing, so every run re-verifies and re-analyses on mismatch.
+2026-07-27 — Preview audio is a metronome click generated on device (Mode A) — whether Meta's terms allow proxying their audio is unresolved, and Mode A ships without needing that answer; the PreviewAudio interface allows Mode B later without UI changes.
+2026-07-27 — Factory has a fixture mode that runs with no credentials — otherwise the entire build would be blocked on Meta API access.
+2026-07-27 — The Stop hook tolerates an empty repo and only blocks once real tests exist — a hook failing on turn one would deadlock the build.
+2026-08-01 — Full spec audit. Seven contradictions found and fixed: (1) 02-cut-engine duplicated the BeatMap schema and had gone stale — now references 00-overview §3.1 as the single source; (2) no MVP in-scope list existed anywhere, only an out-of-scope list — added M1–M13; (3) 00-overview said the trending pipeline was out of MVP scope while 01-factory built it as in scope — resolved, discovery is in, scheduling is out; (4) 03-catalogue had no handling for tracks the Factory retires or swaps — added; (5) no spec covered a track being retired while the user was mid-flow — added auto-substitution within ±4 BPM; (6) preview error IDs P1–P5 collided with Factory invariants P1–P9 — renamed to PV; (7) the Muted preview state had no transitions into or out of it.
+2026-08-01 — Codebase lives in a single npm workspace with the Factory beside it — the beat map schema is the contract between them and reviewing both in one diff is what stops it drifting.
+2026-08-01 — react-native-media-toolkit is NOT used for rendering; a custom Expo module wraps Media3 Transformer on Android and AVFoundation on iOS — the library crops and trims a single file and cannot compose a timeline of clips and stills, which is the entire job. This is the §8 spike, answered.
+2026-08-01 — The Factory ships two beat engines: spectral_dp (pure NumPy, default) and an optional beat_this adapter — Beat This! needs PyTorch, and blocking every downstream phase on a 2GB install was not acceptable. The engine that ran is written into every beat map, and get_engine never silently substitutes.
+2026-08-01 — Fixture audio is synthesised rather than sourced — it is unambiguously ours to ship in a public repo, and every fixture has an exact known tempo, so beat detection is tested against ground truth rather than against itself.
+2026-08-01 — Onset detection uses mel-spaced bands, a centred 1024-sample window, and explicit half/double octave checks — summed over linear FFT bins a hi-hat outweighs a kick, and a left-aligned 2048 window reported every beat 78ms early. Both were measured, not assumed.
+2026-08-01 — Reel length scales with the selection instead of being a fixed 30s — a fixed window silently dropped 18 of a 30-item selection when the track's best window sat late.
+2026-08-01 — Spanning adds slots to the window rather than stealing them from other items — otherwise a long clip cost two of the user's pictures their place, and the feature was unreachable in practice.
+2026-08-01 — A new package, @thumpcut/design-tokens, is the single source for every colour, radius and type size — the token gate can then fail a build on a raw hex, which is the only way "follow the design system" survives contact with a deadline.
+2026-08-01 — Every user-facing string lives in app/src/copy.ts, and the copy gate extracts the exact strings from the spec error catalogues and fails on any drift — including a straight apostrophe where the spec has a curly one.
+2026-08-01 — Copy uses the specs' punctuation, not the design system prototype's — the specs and DESIGN-BRIEF use a plain apostrophe; the prototype used a typographic one. CLAUDE.md names the specs as the source of exact text.
+2026-08-01 — A second red, clipText #EF5A45, exists for red *text* — the design system's clip red measures 3.6:1 on a panel, which is unreadable. Every fill, border and indicator still uses the original.
+2026-08-01 — Icons are drawn from plain Views rather than adding react-native-svg — six shapes are not worth a dependency on a phone with 2GB of RAM.
+2026-08-01 — UI verification renders the real screens through react-native-web in headless Chromium and measures them — there is no local Android toolchain, a green build never proves a screen opens, and this catches the class of defect that ships: a 36pt tap target, a row that shatters at 360dp, a label clipped at font scale 1.6.
+2026-08-01 — Sample data for the UI harness lives in tools/, never in app/src — the app ships no demo data, and the token gate would rightly object to placeholder colours beside real screens.
+2026-08-01 — Archivo, Public Sans and JetBrains Mono are vendored into app/assets/fonts — all three are SIL Open Font Licence, and mono-for-numbers is the design's strongest signal; falling back to a system face loses it.
+2026-08-01 — Catalogue, selection, render and share logic are each a pure module with injected adapters — that is what makes 323 TypeScript checks runnable under plain node with no device, no emulator and no network.

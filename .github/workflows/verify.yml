@@ -1,0 +1,58 @@
+name: Verify
+
+# Everything that can be proved without a phone runs here, on every push.
+# What cannot be proved without a phone is listed in PROGRESS.md under
+# "awaiting device verification" and is never quietly ticked off.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  factory:
+    name: Factory (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install --quiet numpy pytest
+      - name: Tests
+        run: python -m pytest factory/tests -q
+      - name: Run end to end with no credentials
+        run: |
+          python -m factory.run --no-upload --out "$RUNNER_TEMP/out" --tmp "$RUNNER_TEMP/tmp"
+          # P1 — no audio may survive a run.
+          test -z "$(ls -A "$RUNNER_TEMP/tmp" 2>/dev/null)" || (echo "audio left on disk" && exit 1)
+
+  javascript:
+    name: Types, tests and the UI gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Install Chromium for the UI gates
+        run: npx playwright install --with-deps chromium
+      - name: UI gates — tokens, copy, geometry, screenshots
+        run: npm run verify:ui
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: artifacts/ui
+          if-no-files-found: warn
+          retention-days: 30

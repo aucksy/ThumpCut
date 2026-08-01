@@ -1,0 +1,48 @@
+/* ThumpCut color system — studio hardware, not web app.
+   Two-accent rule: signal (amber) = playing / energetic. cool (teal) = you chose this,
+   AND the material color of video clips. Never merge the two jobs.
+   clip (red) = destructive / over-limit ONLY. Never decorative. */
+:root {
+  /* base palette */
+  --tc-graphite: #17181A;   /* app background — warm-tinted, never pure black */
+  --tc-panel:    #23252A;   /* cards, sheets, raised surfaces */
+  --tc-panel-2:  #2B2E34;   /* toasts, hover on panel */
+  --tc-bone:     #EAE6DE;   /* primary text + icons — label print */
+  --tc-signal:   #FF9E2C;   /* amber — playback, active, energy */
+  --tc-cool:     #4FB8C4;   /* teal — selection, confirmation, video clips */
+  --tc-clip:     #E23D28;   /* red — destructive, over-limit. one job only */
+
+  /* bone alphas */
+  --tc-bone-70: rgba(234,230,222,.70);
+  --tc-bone-55: rgba(234,230,222,.55);  /* section labels, secondary copy */
+  --tc-bone-35: rgba(234,230,222,.35);
+  --tc-bone-12: rgba(234,230,222,.12);  /* hairlines */
+  --tc-bone-08: rgba(234,230,222,.08);
+
+  /* accent alphas */
+  --tc-cool-50:   rgba(79,184,196,.50);
+  --tc-cool-12:   rgba(79,184,196,.12);
+  --tc-signal-12: rgba(255,158,44,.12);
+  --tc-clip-12:   rgba(226,61,40,.12);
+
+  /* energy ramp — interpolate cool → bone → signal, clip at the drop */
+  --energy-low:  var(--tc-cool);
+  --energy-mid:  var(--tc-bone);
+  --energy-high: var(--tc-signal);
+  --energy-drop: var(--tc-clip);
+
+  /* semantic aliases */
+  --bg-app:          var(--tc-graphite);
+  --surface-raised:  var(--tc-panel);
+  --surface-float:   var(--tc-panel-2);
+  --surface-scrim:   rgba(10,10,12,.62);
+  --text-primary:    var(--tc-bone);
+  --text-secondary:  var(--tc-bone-55);
+  --text-disabled:   var(--tc-bone-35);
+  --accent-playback: var(--tc-signal);
+  --accent-select:   var(--tc-cool);
+  --accent-video:    var(--tc-cool);
+  --danger:          var(--tc-clip);
+  --border-hairline: var(--tc-bone-12);
+  --focus-ring: 0 0 0 2px var(--tc-graphite), 0 0 0 4px var(--tc-cool);
+}

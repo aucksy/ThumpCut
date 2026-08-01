@@ -1,0 +1,39 @@
+{
+  "note": "Synthesised by factory/fixtures/make_fixtures.py. Original work, no licence obligations. expected_* fields are exact ground truth for the tests.",
+  "sampleRate": 22050,
+  "tracks": [
+    {
+      "audio_id": "fixture-chill-96",
+      "file": "chill-96.wav",
+      "title": "Slow Tide",
+      "artist": "ThumpCut Test Kit",
+      "duration_in_ms": 41000,
+      "expected_bpm": 96.0,
+      "expected_beats": 64,
+      "expected_first_beat_sec": 0.0,
+      "expected_beat_interval_sec": 0.625
+    },
+    {
+      "audio_id": "fixture-drive-124",
+      "file": "drive-124.wav",
+      "title": "Night Meter",
+      "artist": "ThumpCut Test Kit",
+      "duration_in_ms": 39710,
+      "expected_bpm": 124.0,
+      "expected_beats": 80,
+      "expected_first_beat_sec": 0.0,
+      "expected_beat_interval_sec": 0.483871
+    },
+    {
+      "audio_id": "fixture-hype-150",
+      "file": "hype-150.wav",
+      "title": "Redline",
+      "artist": "ThumpCut Test Kit",
+      "duration_in_ms": 39400,
+      "expected_bpm": 150.0,
+      "expected_beats": 96,
+      "expected_first_beat_sec": 0.0,
+      "expected_beat_interval_sec": 0.4
+    }
+  ]
+}

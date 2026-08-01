@@ -1,0 +1,36 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "react",
+      "node"
+    ],
+    "paths": {
+      "@thumpcut/cut-engine": [
+        "../packages/cut-engine/src/index.ts"
+      ],
+      "@thumpcut/design-tokens": [
+        "../packages/design-tokens/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "app/**/*.tsx",
+    "*.ts"
+  ]
+}

@@ -1,0 +1,88 @@
+<!-- @dsCard group="ThumpCut App" viewport="800x950" subtitle="Interactive flow — launch to posted reel, with a state switcher" name="ThumpCut app (interactive)" -->
+<!-- @startingPoint section="ThumpCut App" subtitle="The full nine-screen flow, interactive" viewport="800x950" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>ThumpCut — interactive flow</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="../../tc-loader.js"></script>
+<style>
+body{margin:0;background:#0F1012;font-family:var(--font-body);color:var(--tc-bone)}
+a{color:var(--tc-cool)} a:hover{color:var(--tc-bone)}
+</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const FILES=['components/ruler/BeatRuler.jsx','components/actions/Button.jsx','components/actions/Chip.jsx','components/feedback/Toast.jsx','components/feedback/InlineHint.jsx','components/feedback/TrackNotice.jsx','components/media/MediaTile.jsx','components/media/TemplateCard.jsx','components/media/TrimSheet.jsx','ui_kits/thumpcut/screens.jsx'];
+TCLoad('../..', FILES).then((TC) => {
+  const { SCREEN_DEFS } = TC;
+  function App() {
+    const [scr, setScr] = React.useState('launch');
+    const [st, setSt] = React.useState('default');
+    const [pct, setPct] = React.useState(47);
+    const go = React.useCallback((s, t) => {
+      const def = SCREEN_DEFS.find((d) => d.id === s) || SCREEN_DEFS[0];
+      setScr(def.id); setSt(t || def.states[0][0]);
+    }, []);
+    React.useEffect(() => {
+      if (scr === 'export' && st === 'preparing') {
+        const t = setTimeout(() => setSt('rendering'), 1100); return () => clearTimeout(t);
+      }
+      if (scr === 'export' && st === 'rendering') {
+        setPct(0);
+        const iv = setInterval(() => setPct((p) => {
+          if (p >= 100) { clearInterval(iv); go('share', 'default'); return 100; }
+          return p + 1.6;
+        }), 45);
+        return () => clearInterval(iv);
+      }
+    }, [scr, st]);
+    const def = SCREEN_DEFS.find((d) => d.id === scr);
+    const Comp = def.comp;
+    return (
+      <div style={{display:'flex', gap:30, padding:'28px 32px', alignItems:'flex-start'}}>
+        <div style={{border:'1px solid rgba(234,230,222,.14)', borderRadius:30, overflow:'hidden', flexShrink:0, boxShadow:'0 24px 70px rgba(0,0,0,.6)'}}>
+          <Comp state={scr==='export' && st==='rendering' ? 'rendering' : st} pct={Math.min(99, Math.round(pct))} go={go} />
+        </div>
+        <div style={{width:280, display:'flex', flexDirection:'column', gap:4, paddingTop:6}}>
+          <div style={{display:'flex', alignItems:'center', gap:9, marginBottom:14}}>
+            <img src="../../assets/logo-mark.svg" width="24" height="24" alt=""/>
+            <span style={{fontFamily:'var(--font-display)',fontWeight:800,fontStretch:'80%',letterSpacing:'-.02em',fontSize:18}}>Thumpcut</span>
+            <span style={{fontFamily:'var(--font-data)',fontSize:10,color:'var(--tc-bone-35)',marginLeft:'auto'}}>393×852 · dark only</span>
+          </div>
+          {SCREEN_DEFS.map((d) => (
+            <div key={d.id}>
+              <button onClick={() => go(d.id)} style={{
+                display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
+                background: d.id===scr ? 'var(--tc-panel)' : 'none', border:'none', borderRadius:6,
+                padding:'9px 10px', cursor:'pointer', color: d.id===scr ? 'var(--tc-bone)' : 'var(--tc-bone-55)',
+                fontFamily:'var(--font-body)', fontSize:13.5, fontWeight:500,
+              }}>
+                <span style={{fontFamily:'var(--font-data)', fontSize:11, color: d.id===scr ? 'var(--tc-signal)' : 'var(--tc-bone-35)'}}>{d.n}</span>
+                {d.title}
+              </button>
+              {d.id===scr && d.states.length > 1 && (
+                <div style={{display:'flex', flexWrap:'wrap', gap:5, padding:'7px 10px 10px 30px'}}>
+                  {d.states.map(([k, label]) => (
+                    <button key={k} onClick={() => setSt(k)} title={label} style={{
+                      fontFamily:'var(--font-data)', fontSize:10.5, padding:'4px 8px', borderRadius:4, cursor:'pointer',
+                      background: k===st ? 'var(--tc-cool-12)' : 'none',
+                      border:'1px solid ' + (k===st ? 'var(--tc-cool)' : 'var(--tc-bone-12)'),
+                      color: k===st ? 'var(--tc-cool)' : 'var(--tc-bone-55)',
+                    }}>{k}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          <div style={{fontSize:11.5, lineHeight:1.6, color:'var(--tc-bone-35)', marginTop:14, paddingLeft:10}}>
+            Click through the phone itself — Get started, Create, a clip's duration badge, Export.
+            The state chips flip each screen into its alternate states. Full static board: <a href="states.html">every state</a>.
+          </div>
+        </div>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script>
+</body></html>

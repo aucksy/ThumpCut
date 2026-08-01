@@ -1,0 +1,5 @@
+/* ThumpCut webfonts.
+   Display: Archivo (variable width axis — use font-stretch 62–100% for condensed display)
+   Body:    Public Sans (400 / 500 only)
+   Data:    JetBrains Mono (every number in the product) */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900&family=Public+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500;600&display=swap');

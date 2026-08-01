@@ -1,0 +1,40 @@
+{
+  "name": "thumpcut-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "test": "node --test --experimental-strip-types \"test/*.test.ts\"",
+    "prebuild": "expo prebuild --clean"
+  },
+  "dependencies": {
+    "@thumpcut/cut-engine": "*",
+    "@thumpcut/design-tokens": "*",
+    "expo": "55.0.28",
+    "expo-audio": "55.0.16",
+    "expo-build-properties": "^55.0.7",
+    "expo-constants": "^55.0.6",
+    "expo-file-system": "55.0.24",
+    "expo-font": "55.0.8",
+    "expo-image": "55.0.11",
+    "expo-image-picker": "55.0.22",
+    "expo-intent-launcher": "55.0.14",
+    "expo-keep-awake": "~15.0.0",
+    "expo-linking": "55.0.16",
+    "expo-media-library": "55.0.19",
+    "expo-router": "55.0.17",
+    "expo-splash-screen": "55.0.23",
+    "expo-status-bar": "~3.0.0",
+    "expo-video": "55.0.19",
+    "react": "19.2.0",
+    "react-native": "0.83.10",
+    "react-native-safe-area-context": "~5.8.0",
+    "react-native-screens": "~4.26.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0"
+  }
+}

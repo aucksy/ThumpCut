@@ -1,0 +1,29 @@
+/* ThumpCut type. Three voices, never mixed:
+   Display = Archivo heavy + condensed (screen titles, template names — sparingly)
+   Body    = Public Sans 400/500
+   Data    = JetBrains Mono — EVERY number: BPM, durations, counts, progress */
+:root {
+  --font-display: 'Archivo', sans-serif;
+  --font-body:    'Public Sans', sans-serif;
+  --font-data:    'JetBrains Mono', monospace;
+
+  --display-stretch: 80%;        /* condensed */
+  --display-weight: 800;
+  --display-tracking: -0.02em;   /* tight */
+
+  --text-display-xl: 32px;  /* first-launch hero */
+  --text-display-lg: 24px;  /* screen titles */
+  --text-display-md: 17px;  /* template names */
+  --text-body:       15px;
+  --text-body-sm:    13px;
+  --text-data:       13px;
+  --text-data-sm:    11px;
+  --text-label:      11px;
+
+  --label-tracking: 0.14em; /* section labels: small, uppercase, wide */
+}
+
+.tc-display { font-family: var(--font-display); font-weight: var(--display-weight); font-stretch: var(--display-stretch); letter-spacing: var(--display-tracking); color: var(--text-primary); }
+.tc-body    { font-family: var(--font-body); font-weight: 400; font-size: var(--text-body); line-height: 1.45; color: var(--text-primary); }
+.tc-data    { font-family: var(--font-data); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.tc-label   { font-family: var(--font-body); font-weight: 500; font-size: var(--text-label); letter-spacing: var(--label-tracking); text-transform: uppercase; color: var(--tc-bone-55); }

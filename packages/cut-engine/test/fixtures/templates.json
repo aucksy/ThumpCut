@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "templates": [
+    {
+      "id": "night-drive",
+      "name": "Night drive",
+      "mood": "Upbeat",
+      "previewVideoUrl": "",
+      "previewPosterUrl": "",
+      "idealItemRange": [8, 16],
+      "density": { "low": 4, "medium": 2, "high": 1, "drop": 1 },
+      "transition": "cut",
+      "photoMotion": { "type": "kenBurns", "intensityPct": 6 },
+      "videoBehaviour": {
+        "allowSpeedFit": true,
+        "speedRange": [0.6, 1.6],
+        "preferSpanning": true
+      }
+    },
+    {
+      "id": "golden-hour",
+      "name": "Golden hour",
+      "mood": "Chill",
+      "previewVideoUrl": "",
+      "previewPosterUrl": "",
+      "idealItemRange": [6, 12],
+      "density": { "low": 8, "medium": 4, "high": 2, "drop": 2 },
+      "transition": "crossfade",
+      "photoMotion": { "type": "kenBurns", "intensityPct": 9 },
+      "videoBehaviour": {
+        "allowSpeedFit": true,
+        "speedRange": [0.5, 1.2],
+        "preferSpanning": true
+      }
+    },
+    {
+      "id": "heat",
+      "name": "Heat",
+      "mood": "Hype",
+      "previewVideoUrl": "",
+      "previewPosterUrl": "",
+      "idealItemRange": [10, 20],
+      "density": { "low": 2, "medium": 1, "high": 1, "drop": 1 },
+      "transition": "zoomPunch",
+      "photoMotion": { "type": "kenBurns", "intensityPct": 12 },
+      "videoBehaviour": {
+        "allowSpeedFit": true,
+        "speedRange": [0.75, 2.0],
+        "preferSpanning": false
+      }
+    },
+    {
+      "id": "coastline",
+      "name": "Coastline",
+      "mood": "Cinematic",
+      "previewVideoUrl": "",
+      "previewPosterUrl": "",
+      "idealItemRange": [8, 14],
+      "density": { "low": 8, "medium": 4, "high": 2, "drop": 2 },
+      "transition": "cut",
+      "photoMotion": { "type": "kenBurns", "intensityPct": 5 },
+      "videoBehaviour": {
+        "allowSpeedFit": true,
+        "speedRange": [0.5, 1.1],
+        "preferSpanning": true
+      }
+    },
+    {
+      "id": "blackout",
+      "name": "Blackout",
+      "mood": "Hype",
+      "previewVideoUrl": "",
+      "previewPosterUrl": "",
+      "idealItemRange": [12, 24],
+      "density": { "low": 2, "medium": 1, "high": 1, "drop": 1 },
+      "transition": "cut",
+      "photoMotion": { "type": "none", "intensityPct": 0 },
+      "videoBehaviour": {
+        "allowSpeedFit": false,
+        "speedRange": [1.0, 1.0],
+        "preferSpanning": false
+      }
+    }
+  ]
+}

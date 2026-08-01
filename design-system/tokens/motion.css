@@ -1,0 +1,37 @@
+/* Everything springs. Nothing eases linearly.
+   UI cuts are hard, on the frame — never crossfade the UI's own transitions.
+   No parallax, no glassmorphism, no shimmer loaders.
+   Reduced motion: kill autoplay + pulses, keep the playhead. */
+:root {
+  --spring:      cubic-bezier(.3, 1.4, .4, 1);
+  --spring-soft: cubic-bezier(.25, 1.1, .35, 1);
+  --dur-pulse: 120ms;  /* ruler marker hit — scale only */
+  --dur-fast:  160ms;
+  --dur-med:   280ms;
+  --stagger-card: 80ms; /* template card entry */
+}
+
+/* playhead sweep across the beat ruler — transform only (compositor-friendly).
+   Apply to a full-width wrapper whose child bar sits at left:0. */
+@keyframes tc-sweep { from { transform: translateX(0); } to { transform: translateX(100%); } }
+
+/* marker hit pulse: 120ms, scale only, timed by animation-delay */
+@keyframes tc-pulse {
+  0%, 100% { transform: scale(1); }
+  1.5%     { transform: scale(1.6); }
+  3.5%     { transform: scale(1); }
+}
+
+/* amber on-beat indicator */
+@keyframes tc-beat {
+  0%, 100% { transform: scale(1); opacity: .55; }
+  6%       { transform: scale(1.35); opacity: 1; }
+  18%      { transform: scale(1); opacity: .55; }
+}
+
+/* spring-in for sheets and cards */
+@keyframes tc-rise { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-anim-pulse, .tc-anim-beat { animation: none !important; }
+}

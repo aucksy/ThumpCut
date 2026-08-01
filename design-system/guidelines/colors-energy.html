@@ -1,0 +1,27 @@
+<!-- @dsCard group="Colors" viewport="700x170" subtitle="Cool at low energy through bone to signal, clip at the drop" name="Energy ramp" -->
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+body{margin:0;background:var(--tc-graphite);font-family:var(--font-body);color:var(--tc-bone);display:flex;flex-direction:column;justify-content:center;gap:12px;padding:24px 28px;box-sizing:border-box;height:170px}
+#ramp{display:flex;align-items:flex-end;gap:3px;height:56px}
+.lbl{display:flex;justify-content:space-between;font-family:var(--font-data);font-size:11px;color:var(--tc-bone-55)}
+</style>
+</head><body>
+<div id="ramp"></div>
+<div class="lbl"><span>calm &middot; cool</span><span>rising &middot; bone</span><span>high &middot; signal</span><span>drop &middot; clip</span></div>
+<script>
+const stops=[[79,184,196],[234,230,222],[255,158,44]];
+function lerp(a,b,t){return a.map((v,i)=>Math.round(v+(b[i]-v)*t));}
+const ramp=document.getElementById('ramp');
+for(let i=0;i<48;i++){
+  const t=i/47; let c;
+  if(t>0.92) c=[226,61,40];
+  else if(t<0.5) c=lerp(stops[0],stops[1],t/0.5);
+  else c=lerp(stops[1],stops[2],(t-0.5)/0.42);
+  const d=document.createElement('div');
+  const down=i%4===0;
+  d.style.cssText=`flex:1;border-radius:2px;background:rgb(${c});height:${down?100:55+30*t}%`;
+  ramp.appendChild(d);
+}
+</script>
+</body></html>

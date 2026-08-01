@@ -1,0 +1,13 @@
+/* 4pt grid. Hardware isn't pillowy: 8pt radius on cards, 4pt on chips. */
+:root {
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px; --sp-9: 56px;
+
+  --r-card: 8px;   /* cards, tiles, buttons, sheets */
+  --r-chip: 4px;   /* chips, small badges */
+
+  --tap-min: 44px; /* minimum tap target */
+  --screen-w: 393px;
+  --screen-h: 852px;
+  --screen-pad: 20px;
+}

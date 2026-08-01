@@ -1,0 +1,29 @@
+<!-- @dsCard group="Components" viewport="700x270" subtitle="Bone primary, hairline secondary, red text destructive; teal chips" name="Buttons & chips" -->
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="../../tc-loader.js"></script>
+<style>body{margin:0;background:var(--tc-graphite);padding:22px 26px;box-sizing:border-box;font-family:var(--font-body)}</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+TCLoad('../..', ['components/actions/Button.jsx','components/actions/Chip.jsx']).then(({Button, Chip}) => {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+      <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+        <Button>Export</Button>
+        <Button variant="secondary">Shuffle order</Button>
+        <Button variant="destructive" small>Cancel</Button>
+        <Button variant="ghost" small>Not now</Button>
+        <Button disabled>Continue</Button>
+      </div>
+      <div style={{display:'flex',gap:8}}>
+        <Chip selected>All</Chip><Chip>Chill</Chip><Chip>Upbeat</Chip><Chip>Hype</Chip><Chip>Cinematic</Chip>
+      </div>
+      <div className="tc-data" style={{fontSize:11,color:'var(--tc-bone-35)'}}>one primary per screen · press = scale .97 spring · chips 4pt radius</div>
+    </div>
+  );
+});
+</script>
+</body></html>

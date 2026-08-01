@@ -1,0 +1,19 @@
+{
+  "name": "@thumpcut/ui-verify",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-verification harness: renders every ThumpCut screen state, measures it, and checks it against the design system and the specs.",
+  "scripts": {
+    "verify": "node src/run.mjs",
+    "screens": "node src/run.mjs --screens",
+    "serve": "node src/serve.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "playwright": "^1.62.0",
+    "react-dom": "19.2.0",
+    "react-native-web": "^0.21.2"
+  }
+}

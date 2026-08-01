@@ -1,0 +1,89 @@
+<!-- @dsCard group="ThumpCut App" viewport="1680x1000" subtitle="The journey in order, then every alternate state grouped by screen" name="Every screen, every state" -->
+<!-- @startingPoint section="ThumpCut App" subtitle="Static board — all 9 screens, all states" viewport="1680x1000" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>ThumpCut — every screen, every state</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="../../tc-loader.js"></script>
+<style>
+body{margin:0;background:#0F1012;font-family:var(--font-body);color:var(--tc-bone)}
+a{color:var(--tc-cool)} a:hover{color:var(--tc-bone)}
+.frame{border:1px solid rgba(234,230,222,.13);border-radius:26px;overflow:hidden;background:var(--tc-graphite);flex-shrink:0}
+</style>
+</head><body><div id="root"></div>
+<script type="text/babel">
+const FILES=['components/ruler/BeatRuler.jsx','components/actions/Button.jsx','components/actions/Chip.jsx','components/feedback/Toast.jsx','components/feedback/InlineHint.jsx','components/feedback/TrackNotice.jsx','components/media/MediaTile.jsx','components/media/TemplateCard.jsx','components/media/TrimSheet.jsx','ui_kits/thumpcut/screens.jsx'];
+TCLoad('../..', FILES).then((TC) => {
+  const { SCREEN_DEFS } = TC;
+  const noop = () => {};
+  const Frame = ({ def, state, cap, note, zoom = 0.62 }) => {
+    const Comp = def.comp;
+    return (
+      <div style={{display:'flex', flexDirection:'column', gap:9, width: Math.round(393*zoom), flexShrink:0}}>
+        <div style={{width: Math.round(393*zoom), height: Math.round(852*zoom), overflow:'hidden', borderRadius:18, border:'1px solid rgba(234,230,222,.13)'}}>
+          <div className="frame" style={{transform:'scale('+zoom+')', transformOrigin:'top left', width:393, border:'none', borderRadius:0}}><Comp state={state} go={noop}/></div>
+        </div>
+        <div style={{fontSize:12.5, fontWeight:500, color:'var(--tc-bone)'}}>{cap}</div>
+        {note && <div style={{fontFamily:'var(--font-data)', fontSize:10.5, lineHeight:1.5, color:'var(--tc-bone-35)', marginTop:-4}}>{note}</div>}
+      </div>
+    );
+  };
+  const JOURNEY = [
+    ['launch','default','Launch'], ['gallery','default','Pick a style'], ['media','ready','Pick items'],
+    ['trim','default','Trim a clip'], ['recommended','default','Made for you'], ['preview','default','Preview on the click'],
+    ['export','rendering','Export'], ['share','default','Share'], ['settings','default','Settings'],
+  ];
+  const NOTES = {
+    'gallery/offline':'no warning, no banner — cached is normal',
+    'preview/default':'metronome click, not the song — ruler and pulse carry the sync',
+    'export/memory':'no retry — the fix is fewer clips',
+    'share/noinstagram':'button absent entirely, never greyed out',
+  };
+  function Board() {
+    const byId = Object.fromEntries(SCREEN_DEFS.map((d) => [d.id, d]));
+    return (
+      <div style={{padding:'40px 48px 80px', display:'flex', flexDirection:'column', gap:44}}>
+        <div style={{display:'flex', alignItems:'flex-end', justifyContent:'space-between', flexWrap:'wrap', gap:20}}>
+          <div style={{display:'flex', alignItems:'center', gap:16}}>
+            <img src="../../assets/app-icon.svg" width="56" height="56" style={{borderRadius:14}} alt=""/>
+            <div>
+              <div style={{fontFamily:'var(--font-display)',fontWeight:800,fontStretch:'80%',letterSpacing:'-.02em',fontSize:30,lineHeight:1,display:'flex',alignItems:'baseline'}}>Thump<span style={{width:2.5,height:19,background:'var(--tc-signal)',borderRadius:1,margin:'0 2px',alignSelf:'center'}}></span>cut</div>
+              <div style={{fontSize:13, color:'var(--tc-bone-55)', marginTop:6}}>Every screen, every state. A state with no design is a state that will be built badly.</div>
+            </div>
+          </div>
+          <div style={{fontFamily:'var(--font-data)', fontSize:11, color:'var(--tc-bone-35)', textAlign:'right', lineHeight:1.7}}>
+            393×852 · dark only · Android + iOS from one system<br/>interactive flow: <a href="index.html">index.html</a>
+          </div>
+        </div>
+
+        <section>
+          <div className="tc-label" style={{marginBottom:16, display:'flex', alignItems:'center', gap:12}}>The journey — launch to posted reel<span style={{flex:1,height:1,background:'var(--tc-bone-12)'}}></span></div>
+          <div style={{display:'flex', gap:22, overflowX:'auto', paddingBottom:6}}>
+            {JOURNEY.map(([id, st, cap], i) => (
+              <Frame key={id+st} def={byId[id]} state={st} zoom={0.68}
+                cap={<span><span style={{fontFamily:'var(--font-data)', fontSize:11, color:'var(--tc-signal)', marginRight:7}}>{byId[id].n}</span>{cap}</span>} />
+            ))}
+          </div>
+        </section>
+
+        {SCREEN_DEFS.map((d) => (
+          <section key={d.id}>
+            <div className="tc-label" style={{marginBottom:16, display:'flex', alignItems:'center', gap:12}}>
+              <span style={{fontFamily:'var(--font-data)', color:'var(--tc-signal)', letterSpacing:0}}>{d.n}</span>{d.title} — {d.states.length} state{d.states.length>1?'s':''}
+              <span style={{flex:1,height:1,background:'var(--tc-bone-12)'}}></span>
+            </div>
+            <div style={{display:'flex', gap:20, flexWrap:'wrap'}}>
+              {d.states.map(([k, label]) => (
+                <Frame key={k} def={d} state={k} cap={label} note={NOTES[d.id+'/'+k]} zoom={0.55}/>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<Board/>);
+});
+</script>
+</body></html>
