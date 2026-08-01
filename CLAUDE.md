@@ -11,17 +11,18 @@ Read this at the start of every session. Project rules win over defaults.
 The owner is a **product manager, not a coder**. Everything written to him is plain English —
 every message, every finding, every option — not just the closing block.
 
-Every session ends with exactly this block, bold and short. **Max ~10 lines. Nothing after it.**
+Every session ends with exactly this block. **Max ~10 lines. Nothing after it.**
+Bold the thing itself in each line, so it can be skimmed in five seconds.
 
 ```
-## ✅ Done
+## Done
 - **<thing>** — one line, what a person would notice
 
-## 🔴 Needs you
+## Needs you
 - **<thing>** — a decision, a test on your phone, a secret, or money. Nothing else.
   (or "Nothing — next session can just continue")
 
-## ▶️ Next
+## Next
 - **<one line>**
 ```
 
