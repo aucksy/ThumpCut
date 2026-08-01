@@ -110,7 +110,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPad,
     gap: space.s3,
   },
-  topBarSide: { width: 32, flexDirection: "row", flexShrink: 0 },
+  // A minimum, not a fixed width: a fixed 32 clipped the selection counter to "15/…", and a
+  // counter you cannot read is the one number on that screen that has to be readable.
+  topBarSide: { minWidth: 32, flexDirection: "row", flexShrink: 0 },
   topBarRight: { justifyContent: "flex-end" },
   // Clipped rather than allowed to push the back button off the screen at large font sizes.
   topBarCentre: { flex: 1, flexShrink: 1, alignItems: "center", overflow: "hidden" },

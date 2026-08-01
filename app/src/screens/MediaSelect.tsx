@@ -17,7 +17,7 @@ import {
   formatDuration,
   formatSelectionHeader,
 } from "../copy.ts";
-import { MAX_MEDIA_ITEMS } from "@thumpcut/cut-engine";
+import { MAX_MEDIA_ITEMS, MAX_VIDEO_ITEMS } from "@thumpcut/cut-engine";
 import type { LibraryItem, SelectionState } from "../media/selection.ts";
 import { canContinue, videoCount } from "../media/selection.ts";
 import { Button } from "../ui/controls.tsx";
@@ -52,7 +52,7 @@ export function MediaSelectScreen({
   const selectedCount = state.selectedIds.length;
   const clips = videoCount(state);
   const atItemCap = selectedCount >= MAX_MEDIA_ITEMS;
-  const atVideoCap = clips >= 15;
+  const atVideoCap = clips >= MAX_VIDEO_ITEMS;
 
   const showGrid =
     state.status !== "PermissionUnknown" &&

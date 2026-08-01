@@ -87,6 +87,8 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: layout.screenPad, paddingTop: space.s2, paddingBottom: 40 },
   madeFor: { marginBottom: space.s3 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.s3 },
-  cell: { width: "47%", flexGrow: 1, flexBasis: "47%" },
+  // A fixed width, never flexGrow: a lone card on the last row was stretching to the full
+  // width of the screen and becoming a 568pt-tall slab.
+  cell: { width: "48%", flexGrow: 0, flexShrink: 0 },
   divider: { marginTop: space.s5, marginBottom: space.s3 },
 });

@@ -126,8 +126,10 @@ const LIBRARY_SHAPE: { kind: "photo" | "video"; durationSec?: number }[] = [
   { kind: "photo" },
   { kind: "video", durationSec: 21 },
   { kind: "photo" },
-  { kind: "photo" },
-  { kind: "photo" },
+  // Enough spare clips that the video-cap state can show some dimmed and some picked. A
+  // fixture that cannot express the state it is illustrating hides the very thing it is for.
+  { kind: "video", durationSec: 9 },
+  { kind: "video", durationSec: 4 },
   { kind: "photo" },
 ];
 
@@ -160,6 +162,27 @@ export function selectionFor(
     ...overrides,
   };
 }
+
+/**
+ * A library big enough to reach the fifteen-clip cap.
+ *
+ * The video-cap state cannot be illustrated with five clips, and a state that cannot be
+ * rendered is a state nobody ever looks at. This one exists to show the thing the design brief
+ * is most insistent about: at the cap, **clips dim and photos stay live**.
+ */
+export const CLIP_HEAVY_LIBRARY: LibraryItem[] = Array.from({ length: 27 }, (_, index) => {
+  const isVideo = index % 3 !== 2;
+  const item: LibraryItem = {
+    id: `heavy-${index + 1}`,
+    uri: placeholder(index + 40),
+    kind: isVideo ? "video" : "photo",
+    width: isVideo ? 1920 : 3000,
+    height: isVideo ? 1080 : 4000,
+    rotationDeg: 0,
+  };
+  if (isVideo) item.durationSec = 5 + (index % 7);
+  return item;
+});
 
 export const SAMPLE_TRACK = {
   title: "Night Meter",

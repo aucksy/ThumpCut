@@ -139,7 +139,9 @@ const styles = StyleSheet.create({
     paddingTop: space.s3,
     paddingBottom: 108,
   },
-  cell: { width: "47%", flexGrow: 1, flexBasis: "47%" },
+  // A fixed width, never flexGrow: a lone card on the last row was stretching to the full
+  // width of the screen and becoming a 568pt-tall slab.
+  cell: { width: "48%", flexGrow: 0, flexShrink: 0 },
   createRow: {
     position: "absolute",
     left: 0,

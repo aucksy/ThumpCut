@@ -23,6 +23,7 @@ import { recommendTemplates } from "../../../../app/src/templates/recommend.ts";
 import type { RenderSnapshot } from "../../../../app/src/render/orchestrator.ts";
 import type { ShareSnapshot } from "../../../../app/src/share/controller.ts";
 import {
+  CLIP_HEAVY_LIBRARY,
   SAMPLE_LIBRARY,
   SAMPLE_RULER,
   SAMPLE_TEMPLATES,
@@ -188,7 +189,12 @@ export const SCREEN_STATES: ScreenState[] = [
       <MediaSelectScreen
         state={{
           ...selectionFor({ selectedCount: 0, status: "VideoCapReached" }),
-          selectedIds: SAMPLE_LIBRARY.filter((item) => item.kind === "video").map((item) => item.id),
+          library: CLIP_HEAVY_LIBRARY,
+          // Fifteen clips picked, five more still in the grid: those five dim, and every
+          // photo stays live. That contrast is the whole point of the state.
+          selectedIds: CLIP_HEAVY_LIBRARY.filter((item) => item.kind === "video")
+            .slice(0, 15)
+            .map((item) => item.id),
           toast: COPY.media.videoCapReached,
         }}
       />
