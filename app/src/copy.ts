@@ -175,13 +175,19 @@ export function formatDuration(seconds: number): string {
   return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
-/** `0:02.4` — a trim in-point. Tenths matter when you are choosing a moment. */
+/**
+ * `0:02.4` — a trim in-point. Tenths matter when you are choosing a moment.
+ *
+ * Everything is done in whole tenths rather than by taking the fractional part: 2.4 is not
+ * exactly 2.4 in binary, so `(2.4 - 2) * 10` is 3.9999999999999996 and truncating it showed
+ * the user `0:02.3` for a value of 2.4.
+ */
 export function formatPreciseDuration(seconds: number): string {
   const safe = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
-  const minutes = Math.floor(safe / 60);
-  const remainder = safe % 60;
-  const whole = Math.floor(remainder);
-  const tenth = Math.floor((remainder - whole) * 10);
+  const totalTenths = Math.round(safe * 10);
+  const minutes = Math.floor(totalTenths / 600);
+  const whole = Math.floor((totalTenths % 600) / 10);
+  const tenth = totalTenths % 10;
   return `${minutes}:${String(whole).padStart(2, "0")}.${tenth}`;
 }
 

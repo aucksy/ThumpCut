@@ -378,6 +378,15 @@ describe("every number is formatted the way the design brief specifies", () => {
     assert.equal(formatInPoint(2.44), "IN 0:02.4");
   });
 
+  it("trim in-points survive binary floating point", () => {
+    // 2.4 is not exactly 2.4 in binary. Truncating the fractional part showed 0:02.3.
+    assert.equal(formatPreciseDuration(2.4), "0:02.4");
+    assert.equal(formatPreciseDuration(0.3), "0:00.3");
+    assert.equal(formatPreciseDuration(8.7), "0:08.7");
+    assert.equal(formatPreciseDuration(59.96), "1:00.0");
+    assert.equal(formatPreciseDuration(61.25), "1:01.3");
+  });
+
   it("the selection header", () => {
     assert.equal(formatSelectionHeader(9, 3), "9 items · 3 clips");
     assert.equal(formatSelectionHeader(1, 1), "1 item · 1 clip");
