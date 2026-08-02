@@ -240,8 +240,11 @@ class ReelRenderModule : Module() {
         val uri = cut["uri"] as? String
           ?: throw CodedException("unknown", "A cut has no source.", null)
         val kind = cut["kind"] as? String ?: "photo"
-        val holdDurationSec = cut["holdDurationSec"] as? Double ?: 0.0
-        val freezeFromSec = cut["freezeFromSec"] as? Double
+        // `as? Number`, never `as? Double`: a JavaScript number that happens to be whole —
+        // a Ken Burns scale of exactly 1, a speed of exactly 1 — can cross the bridge as an
+        // Int, and an `as? Double` on it silently drops the value.
+        val holdDurationSec = (cut["holdDurationSec"] as? Number)?.toDouble() ?: 0.0
+        val freezeFromSec = (cut["freezeFromSec"] as? Number)?.toDouble()
         val needsStill = kind == "video" && holdDurationSec > MIN_PART_SEC && freezeFromSec != null
         val freezeFrame = if (needsStill) {
           extractFreezeFrame(context, uri, freezeFromSec as Double, index).also(extracted::add)
@@ -251,14 +254,14 @@ class ReelRenderModule : Module() {
         ParsedCut(
           uri = uri,
           kind = kind,
-          durationSec = cut["durationSec"] as? Double ?: 0.0,
-          sourceInSec = cut["sourceInSec"] as? Double ?: 0.0,
-          sourceOutSec = cut["sourceOutSec"] as? Double ?: 0.0,
-          speed = cut["speed"] as? Double ?: 1.0,
+          durationSec = (cut["durationSec"] as? Number)?.toDouble() ?: 0.0,
+          sourceInSec = (cut["sourceInSec"] as? Number)?.toDouble() ?: 0.0,
+          sourceOutSec = (cut["sourceOutSec"] as? Number)?.toDouble() ?: 0.0,
+          speed = (cut["speed"] as? Number)?.toDouble() ?: 1.0,
           freezeFromSec = freezeFromSec,
           holdDurationSec = holdDurationSec,
-          kenBurnsFrom = cut["kenBurnsFrom"] as? Double,
-          kenBurnsTo = cut["kenBurnsTo"] as? Double,
+          kenBurnsFrom = (cut["kenBurnsFrom"] as? Number)?.toDouble(),
+          kenBurnsTo = (cut["kenBurnsTo"] as? Number)?.toDouble(),
           transitionIn = cut["transitionIn"] as? String ?: "cut",
           freezeFrame = freezeFrame,
         )
@@ -551,8 +554,10 @@ class ReelRenderModule : Module() {
   private fun toAudioSequence(audio: Map<String, Any?>): EditedMediaItemSequence {
     val uri = audio["uri"] as? String
       ?: throw CodedException("unknown", "The audio has no source.", null)
-    val startMs = ((audio["startSec"] as? Double ?: 0.0) * 1000).toLong()
-    val durationMs = ((audio["durationSec"] as? Double ?: 0.0) * 1000).toLong()
+    // `as? Number`: a whole-second start offset can arrive as an Int, and `as? Double` on it
+    // would silently play the music from the top of the track instead of the reel's window.
+    val startMs = (((audio["startSec"] as? Number)?.toDouble() ?: 0.0) * 1000).toLong()
+    val durationMs = (((audio["durationSec"] as? Number)?.toDouble() ?: 0.0) * 1000).toLong()
     if (durationMs <= 0) {
       throw CodedException("unknown", "The audio has no duration.", null)
     }
