@@ -87,7 +87,11 @@ const config: ExpoConfig = {
         android: {
           // Media3 Transformer, which the renderer composes the timeline with.
           minSdkVersion: 24,
-          compileSdkVersion: 35,
+          // 36 because Media3 1.10 refuses to be consumed by anything compiled against less.
+          // Compiling against a newer platform only makes newer APIs available; it is
+          // `targetSdkVersion` that opts an app in to new runtime behaviour, and that stays
+          // where it was.
+          compileSdkVersion: 36,
           targetSdkVersion: 35,
         },
         ios: { deploymentTarget: "15.1" },
