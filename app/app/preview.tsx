@@ -106,21 +106,29 @@ export default function PreviewRoute() {
     };
   }, [audio, beatMap, cutList]);
 
+  /**
+   * The listener below must not be torn down and rebuilt every time the cut list changes —
+   * that happens on every style tap, and its cleanup releases the players, which would drop
+   * the music back into buffering each time. So it depends only on the audio, and reads the
+   * current beat map and cut list from here.
+   */
+  const latest = useRef({ beatMap, cutList });
+  useEffect(() => {
+    latest.current = { beatMap, cutList };
+  }, [beatMap, cutList]);
+
   useEffect(() => {
     const subscription = RNAppState.addEventListener("change", (next) => {
+      const { beatMap: map, cutList: list } = latest.current;
       if (next === "active") {
-        if (beatMap && cutList) {
-          void audio.load(beatMap).then(() => audio.play(cutList.audioStartSec));
-        }
+        if (map && list) void audio.load(map).then(() => audio.play(list.audioStartSec));
       } else {
+        // V6 — nothing keeps playing in a pocket. The effect above recreates it on return.
         audio.release();
       }
     });
-    return () => {
-      subscription.remove();
-      audio.release();
-    };
-  }, [audio, beatMap, cutList]);
+    return () => subscription.remove();
+  }, [audio]);
 
   /**
    * The item the cut list says belongs at this moment. Without it the stage is a grey

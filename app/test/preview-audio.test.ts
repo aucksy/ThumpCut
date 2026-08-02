@@ -144,6 +144,13 @@ class FakePlayer implements PreviewAudio {
 
 class FakeStream extends FakePlayer implements StreamPlayer {
   isReady = false;
+  seeks: number[] = [];
+
+  seekTo(seconds: number): void {
+    this.seeks.push(seconds);
+    this.position = seconds;
+  }
+
   private settle: (() => void) | null = null;
   private reject: ((error: Error) => void) | null = null;
 
@@ -212,13 +219,19 @@ describe("click first, music the moment it arrives", () => {
   });
 
   it("does not start the music if the user had already paused", async () => {
-    const { audio, stream } = build();
+    const { audio, click, stream } = build();
     await audio.load(BEAT_MAP);
     audio.play(4);
+    click.position = 7.25;
     audio.pause();
 
     await stream.arrive();
-    assert.equal(stream.playing, false);
+
+    assert.equal(stream.playing, false, "nothing starts playing behind a pause");
+    // But it still has to agree with where the ruler and the picture already are, or
+    // everything on screen jumps back to the top of the track.
+    assert.deepEqual(stream.seeks, [7.25]);
+    assert.equal(audio.getPositionSec(), 7.25);
   });
 
   it("keeps the click and says why when the recording never arrives", async () => {

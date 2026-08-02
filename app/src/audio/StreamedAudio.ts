@@ -172,7 +172,14 @@ export class StreamedAudio implements PreviewAudio {
     this.player = null;
   }
 
-  private seekTo(seconds: number): void {
+  /**
+   * Move to a position without starting playback — `play()` below is what starts it.
+   *
+   * Used when the recording finishes loading while the preview is paused: the player has to
+   * agree with where the ruler and the picture already are, or the moment it becomes the one
+   * being asked for the position, everything on screen jumps back to the top of the track.
+   */
+  seekTo(seconds: number): void {
     const player = this.player;
     if (!player) return;
     this.seekTarget = seconds;

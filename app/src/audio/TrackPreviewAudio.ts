@@ -30,6 +30,8 @@ export interface PreviewAudioStatus {
 /** What this needs from a streamed player. `StreamedAudio` is the only real one. */
 export interface StreamPlayer extends PreviewAudio {
   readonly isReady: boolean;
+  /** Move to a position without starting playback. */
+  seekTo(seconds: number): void;
 }
 
 /**
@@ -167,7 +169,11 @@ export class TrackPreviewAudio implements PreviewAudio {
     this.click.pause();
     this.mode = "streaming";
     this.reason = null;
+    // Either way the player is put where the click had reached. If the preview is paused it
+    // still becomes the thing the screen asks for the position, and a player sitting at zero
+    // would throw the ruler and the picture back to the start of the track.
     if (this.running) stream.play(position);
+    else stream.seekTo(position);
     this.onStatus?.(this.status());
   }
 
