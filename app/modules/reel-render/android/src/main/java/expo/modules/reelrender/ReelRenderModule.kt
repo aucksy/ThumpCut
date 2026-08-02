@@ -24,6 +24,10 @@ import androidx.media3.transformer.InAppMp4Muxer
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import expo.modules.kotlin.exception.CodedException
+// `Coroutine` is an infix extension on the builder returned by the name-only AsyncFunction, and
+// it is not imported by the module DSL. Without this line it reads as an unresolved reference
+// and the suspend body will not compile.
+import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
