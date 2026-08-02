@@ -122,6 +122,13 @@ export const COPY = {
     /** R6 */
     tooFewUsable: "We need at least 3 usable items to make a reel.",
     retry: "Retry",
+    /**
+     * R2's recovery is "Return to preview", not a retry — the reel is too heavy for the phone
+     * and trying again would fail the same way. The catalogue names the recovery but not a
+     * label, so the label is the catalogue's own words. Without it this state is a message on
+     * a modal sheet with nothing to press.
+     */
+    returnToPreview: "Return to preview",
   },
 
   // --- Share (spec 07 §6) --------------------------------------------------------------------------

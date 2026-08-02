@@ -39,6 +39,12 @@ export default function PreviewRoute() {
   const [positionSec, setPositionSec] = useState(0);
   const [render, setRender] = useState<RenderSnapshot>(controller.snapshot());
   const [exporting, setExporting] = useState(false);
+  /**
+   * A failed export leaves the controller reporting "Failed" for ever, which would pin the
+   * sheet open. This is what lets the user out of it, and it is cleared the moment they try
+   * again so a second failure is not swallowed.
+   */
+  const [dismissedFailure, setDismissedFailure] = useState(false);
 
   useEffect(() => controller.subscribe(setRender), [controller]);
 
@@ -88,6 +94,7 @@ export default function PreviewRoute() {
   const onExport = useCallback(() => {
     if (!cutList) return;
     setExporting(true);
+    setDismissedFailure(false);
     audio.pause();
     // R-I9 — the very cut list the user just watched, not a rebuilt one.
     void controller.start(cutList, media).then((result) => {
@@ -128,7 +135,7 @@ export default function PreviewRoute() {
         onExport={onExport}
       />
 
-      {exporting || render.status === "Failed" ? (
+      {(exporting || render.status === "Failed") && !dismissedFailure ? (
         <ExportSheet
           snapshot={render}
           onCancel={() => {
@@ -136,6 +143,10 @@ export default function PreviewRoute() {
             setExporting(false);
           }}
           onRetry={onExport}
+          onDismiss={() => {
+            setExporting(false);
+            setDismissedFailure(true);
+          }}
         />
       ) : null}
     </View>

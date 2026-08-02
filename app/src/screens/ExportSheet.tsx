@@ -6,7 +6,7 @@
  * to say "done" is a screen that wastes a tap.
  */
 
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { colors, radius, shadow } from "@thumpcut/design-tokens";
 import { COPY, formatPercent } from "../copy.ts";
 import type { RenderSnapshot } from "../render/orchestrator.ts";
@@ -18,12 +18,30 @@ export interface ExportSheetProps {
   snapshot: RenderSnapshot;
   onCancel?: () => void;
   onRetry?: () => void;
+  /** Closes the sheet and leaves the user back on the preview. */
+  onDismiss?: () => void;
 }
 
-export function ExportSheet({ snapshot, onCancel, onRetry }: ExportSheetProps) {
+export function ExportSheet({ snapshot, onCancel, onRetry, onDismiss }: ExportSheetProps) {
+  const failed = snapshot.status === "Failed";
+
   return (
     <View style={styles.wrapper} testID="screen-export">
-      <View style={styles.scrim} />
+      {/*
+        Tappable only once the export has failed. While it is running there is a Cancel button
+        and a render to stop, and a stray tap outside the sheet must not be mistaken for it.
+      */}
+      {failed ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={COPY.a11y.back}
+          onPress={onDismiss}
+          style={styles.scrim}
+          testID="export-scrim"
+        />
+      ) : (
+        <View style={styles.scrim} />
+      )}
       <View style={styles.sheet}>
         <View style={styles.grabber} />
         <View style={styles.body}>
@@ -45,16 +63,27 @@ export function ExportSheet({ snapshot, onCancel, onRetry }: ExportSheetProps) {
             </>
           ) : null}
 
-          {snapshot.status === "Failed" && snapshot.error ? (
+          {failed && snapshot.error ? (
             <>
               <Body style={styles.text} testID="export-error">
                 {snapshot.error}
               </Body>
+              {/*
+                Every row of the error catalogue has a recovery, and this is where it lives.
+                A failure that can be retried gets Retry; one that cannot — the reel is simply
+                too heavy for the phone, and a second attempt fails identically — sends the
+                user back to the preview to drop some clips. Without the second case this sheet
+                showed a sentence and nothing to press.
+              */}
               {snapshot.canRetry ? (
                 <Button variant="secondary" small onPress={onRetry} testID="export-retry">
                   {COPY.render.retry}
                 </Button>
-              ) : null}
+              ) : (
+                <Button variant="secondary" small onPress={onDismiss} testID="export-dismiss">
+                  {COPY.render.returnToPreview}
+                </Button>
+              )}
             </>
           ) : null}
         </View>

@@ -40,6 +40,12 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci --no-audit --no-fund
+      - name: Dependency versions match the SDK
+        # A package on a version the SDK does not expect breaks the native build and nothing
+        # else — types pass, tests pass, screens render. react-native-screens one minor ahead
+        # failed React Native's code generator and took a whole cloud build with it.
+        working-directory: app
+        run: npx expo install --check
       - name: Typecheck
         run: npm run typecheck
       - name: Tests
