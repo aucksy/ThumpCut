@@ -17,7 +17,7 @@ Last updated: 2026-08-02, second session.
 | 09 Royalty-free | ☑ | ☑ | ☐ | **New.** Jamendo section built end to end against stubs; needs the free key. |
 | 10 Share anywhere | ☑ | ☑ | ☐ | **New.** YouTube + system sheet for reels that carry music. |
 | Design system | ☑ | ☑ | ☐ | 54 screen states rendered, measured and screenshotted on every push. |
-| Cloud build | ☑ | ☑ | ☑ | Green through build 20. This session's build must be read, not assumed. |
+| Cloud build | ☑ | ☑ | ☑ | Build 22 published and opened, not assumed: signed, 47.0 MB, phone ABIs only; the audio decoder, renderer and share modules are compiled in; the manifest carries the music permission and the YouTube/TikTok visibility entries; the bundle carries the beat engine and every new screen's copy. |
 
 Totals: **579 automated checks** — 179 Python, 400 TypeScript (189 app + 173 cut engine +
 20 beat engine + 18 design tokens) — plus 4 UI gates over 162 screen-state measurements at
