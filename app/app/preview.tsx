@@ -23,6 +23,7 @@ import { StreamedAudio } from "../src/audio/StreamedAudio.ts";
 import { TrackPreviewAudio } from "../src/audio/TrackPreviewAudio.ts";
 import { markersForCuts } from "../src/templates/recommend.ts";
 import { formatBpm } from "../src/copy.ts";
+import { deriveExportAudio } from "../src/music/exportAudio.ts";
 import { createRenderEnvironment } from "../src/render/environment.ts";
 import { RenderController, type RenderSnapshot } from "../src/render/orchestrator.ts";
 
@@ -38,6 +39,7 @@ export default function PreviewRoute() {
     selectedTemplate,
     selectedTrack,
     audioPlan,
+    localTrack,
     notice,
     chooseTemplate,
     shuffle,
@@ -150,14 +152,22 @@ export default function PreviewRoute() {
     setExporting(true);
     setDismissedFailure(false);
     audio.pause();
+    // What the file may carry is decided by where the track came from. Instagram-catalogue
+    // tracks produce `none` — the silent export — for ever.
+    const exportAudio = deriveExportAudio(
+      selectedTrack,
+      audioPlan,
+      localTrack?.fileUri ?? null,
+      cutList.audioStartSec,
+    );
     // R-I9 — the very cut list the user just watched, not a rebuilt one.
-    void controller.start(cutList, media).then((result) => {
+    void controller.start(cutList, media, exportAudio).then((result) => {
       if (result.status === "Complete") {
         setExporting(false);
         router.push({ pathname: "/share", params: { uri: result.outputUri ?? "" } });
       }
     });
-  }, [audio, controller, cutList, media, router]);
+  }, [audio, audioPlan, controller, cutList, localTrack, media, router, selectedTrack]);
 
   if (!beatMap || !cutList || !selectedTemplate || !selectedTrack) {
     return <View style={{ flex: 1 }} />;

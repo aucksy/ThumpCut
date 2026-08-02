@@ -8,7 +8,7 @@
     "tools/ui-verify"
   ],
   "scripts": {
-    "typecheck": "tsc -p packages/design-tokens --pretty false && tsc -p packages/cut-engine --pretty false && tsc -p app --pretty false",
+    "typecheck": "tsc -p packages/design-tokens --pretty false && tsc -p packages/cut-engine --pretty false && tsc -p packages/beat-engine --pretty false && tsc -p app --pretty false",
     "test": "npm run test --workspaces --if-present",
     "test:engine": "npm run test -w @thumpcut/cut-engine",
     "test:app": "npm run test -w thumpcut-app",

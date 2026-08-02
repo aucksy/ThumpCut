@@ -13,6 +13,7 @@ import {
   GalleryScreen,
   LaunchScreen,
   MediaSelectScreen,
+  MusicScreen,
   PreviewScreen,
   RecommendedScreen,
   SettingsScreen,
@@ -21,14 +22,18 @@ import {
 import { TrimSheet } from "../../../../app/src/ui/TrimSheet.tsx";
 import { COPY } from "../../../../app/src/copy.ts";
 import { recommendTemplates } from "../../../../app/src/templates/recommend.ts";
+import type { LocalMusicSnapshot } from "../../../../app/src/music/localTracks.ts";
 import type { RenderSnapshot } from "../../../../app/src/render/orchestrator.ts";
 import type { ShareSnapshot } from "../../../../app/src/share/controller.ts";
 import {
   CLIP_HEAVY_LIBRARY,
   SAMPLE_LIBRARY,
+  SAMPLE_LOCAL_TRACK,
   SAMPLE_RULER,
+  SAMPLE_SONGS,
   SAMPLE_TEMPLATES,
   SAMPLE_TRACK,
+  SAMPLE_TRACK_LIST,
   placeholder,
   selectionFor,
 } from "./fixtures.ts";
@@ -59,10 +64,24 @@ function renderSnapshot(patch: Partial<RenderSnapshot>): RenderSnapshot {
 function shareSnapshot(patch: Partial<ShareSnapshot>): ShareSnapshot {
   return {
     status: "Ready",
+    mode: "instagram",
     instagramAvailable: true,
+    youtubeAvailable: false,
+    credit: null,
     message: null,
     videoUri: "file:///reel.mp4",
     busy: false,
+    ...patch,
+  };
+}
+
+function musicSnapshot(patch: Partial<LocalMusicSnapshot>): LocalMusicSnapshot {
+  return {
+    status: "Ready",
+    songs: SAMPLE_SONGS,
+    analysingId: null,
+    progress: 0,
+    message: null,
     ...patch,
   };
 }
@@ -248,6 +267,37 @@ export const SCREEN_STATES: ScreenState[] = [
       />
     ),
   },
+  {
+    id: "05-recommended-tracks",
+    title: "Recommended — track chooser: your music, trending, royalty-free with licences",
+    render: () => (
+      <RecommendedScreen
+        onBack={noop}
+        itemCount={9}
+        clipCount={3}
+        recommendation={recommendTemplates(SAMPLE_TEMPLATES, 9)}
+        bpmForTemplate={bpmFor}
+        tracks={SAMPLE_TRACK_LIST}
+        selectedTrackId="jam-168"
+      />
+    ),
+  },
+  {
+    id: "05-recommended-local-selected",
+    title: "Recommended — the user's own song is the selected track",
+    render: () => (
+      <RecommendedScreen
+        onBack={noop}
+        itemCount={9}
+        clipCount={3}
+        recommendation={recommendTemplates(SAMPLE_TEMPLATES, 9)}
+        bpmForTemplate={() => SAMPLE_LOCAL_TRACK.bpm}
+        tracks={SAMPLE_TRACK_LIST}
+        selectedTrackId={SAMPLE_LOCAL_TRACK.trackId}
+        localTrack={SAMPLE_LOCAL_TRACK}
+      />
+    ),
+  },
 
   // 6 · Preview
   { id: "06-preview-default", title: "Preview — the track is playing", render: () => <PreviewScreen onBack={noop} {...previewBase} /> },
@@ -345,11 +395,113 @@ export const SCREEN_STATES: ScreenState[] = [
     ),
   },
 
+  // 8b · Share — reels that carry their own music
+  {
+    id: "08-share-anywhere",
+    title: "Share — music inside the file: YouTube, share anywhere, and the credit line",
+    render: () => (
+      <ShareState
+        snapshot={shareSnapshot({
+          mode: "anywhere",
+          instagramAvailable: false,
+          youtubeAvailable: true,
+          credit: "Music: Golden Static — The Wire Choir (CC BY)",
+        })}
+      />
+    ),
+  },
+  {
+    id: "08-share-anywhere-no-youtube",
+    title: "Share — music inside, YouTube not installed: sheet becomes primary, no gap",
+    render: () => (
+      <ShareState
+        snapshot={shareSnapshot({
+          mode: "anywhere",
+          instagramAvailable: false,
+          youtubeAvailable: false,
+          credit: "Music: Golden Static — The Wire Choir (CC BY)",
+        })}
+      />
+    ),
+  },
+  {
+    id: "08-share-anywhere-local",
+    title: "Share — the user's own song: no credit owed, none shown",
+    render: () => (
+      <ShareState
+        snapshot={shareSnapshot({
+          mode: "anywhere",
+          instagramAvailable: false,
+          youtubeAvailable: true,
+        })}
+      />
+    ),
+  },
+
   // 9 · Settings
   {
     id: "09-settings",
     title: "Settings — almost empty, and that is the message",
     render: () => <SettingsScreen onBack={noop} exportQuality="1080p" version="ThumpCut 1.0.0 (1)" />,
+  },
+
+  // 11 · Your music
+  {
+    id: "11-music-ready",
+    title: "Your music — the phone's songs, durations in mono",
+    render: () => <MusicScreen onBack={noop} snapshot={musicSnapshot({})} />,
+  },
+  {
+    id: "11-music-analysing",
+    title: "Your music — reading the beat, live percentage, other rows dimmed",
+    render: () => (
+      <MusicScreen
+        onBack={noop}
+        snapshot={musicSnapshot({
+          status: "Analysing",
+          analysingId: "s2",
+          progress: 0.47,
+          message: COPY.music.analysing,
+        })}
+      />
+    ),
+  },
+  {
+    id: "11-music-denied",
+    title: "Your music — permission denied, with the way to Settings",
+    render: () => (
+      <MusicScreen
+        onBack={noop}
+        snapshot={musicSnapshot({
+          status: "PermissionDenied",
+          songs: [],
+          message: COPY.music.permissionDenied,
+        })}
+      />
+    ),
+  },
+  {
+    id: "11-music-empty",
+    title: "Your music — nothing on the device, and what to do about it",
+    render: () => (
+      <MusicScreen
+        onBack={noop}
+        snapshot={musicSnapshot({ status: "Empty", songs: [], message: COPY.music.empty })}
+      />
+    ),
+  },
+  {
+    id: "11-music-failed",
+    title: "Your music — no beat found, the list stays usable",
+    render: () => (
+      <MusicScreen
+        onBack={noop}
+        snapshot={musicSnapshot({
+          status: "AnalysisFailed",
+          message: COPY.music.analysisFailed,
+        })}
+      />
+    ),
   },
 
   // 10 · The screen of last resort. Never seen in normal use; measured anyway, because the one

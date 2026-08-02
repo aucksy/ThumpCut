@@ -38,6 +38,7 @@ import {
   type SelectionAction,
   type SelectionState,
 } from "../media/selection.ts";
+import type { AnalysedLocalTrack } from "../music/localTracks.ts";
 import { findSubstituteTrack, shuffleOrder } from "../templates/recommend.ts";
 
 export interface AppState {
@@ -56,12 +57,17 @@ export interface AppState {
   media: MediaItem[];
   /** Whether the preview may stream the selected track, and why not when it may not. */
   audioPlan: PreviewAudioPlan;
+  /** The user's own song, analysed on this device, when one is in play. */
+  localTrack: AnalysedLocalTrack | null;
   /** Shown once, then cleared. */
   notice: "none" | "adjusted" | "skipped" | "retired";
 
   loadCatalogue: () => Promise<void>;
   retryCatalogue: () => Promise<void>;
   chooseTemplate: (template: CatalogueTemplate) => Promise<void>;
+  chooseTrack: (track: CatalogueTrack) => Promise<void>;
+  /** A song from the phone: makes it the selected track and the flow carries on as normal. */
+  chooseLocalTrack: (analysed: AnalysedLocalTrack) => Promise<void>;
   shuffle: () => void;
   clearNotice: () => void;
 }
@@ -99,6 +105,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     kind: "click",
     reason: "no-entry",
   });
+  const [localTrack, setLocalTrack] = useState<AnalysedLocalTrack | null>(null);
   const [notice, setNotice] = useState<AppState["notice"]>("none");
   const [shuffleSeed, setShuffleSeed] = useState(0);
 
@@ -118,9 +125,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setCatalogue(await service.retry());
   }, [service]);
 
+  /** The local track by reference, so `build` need not depend on state it also sets. */
+  const localTrackRef = useRef<AnalysedLocalTrack | null>(null);
+
   const build = useCallback(
     async (template: CatalogueTemplate, track: CatalogueTrack, items: MediaItem[]) => {
       const token = ++buildToken.current;
+
+      // The user's own song never touches the catalogue service: its beat map was computed
+      // on this device, its audio is the file itself, and nothing about it can be retired.
+      const local = localTrackRef.current;
+      if (local && track.trackId === local.track.trackId) {
+        setBeatMap(local.beatMap);
+        setSelectedTrack(local.track);
+        setSelectedTemplate(template);
+        const next: PreviewAudioPlan = { kind: "stream", url: local.fileUri };
+        setAudioPlan((current) => (samePlan(current, next) ? current : next));
+        setCutList(buildCutList(local.beatMap, items, template));
+        return;
+      }
+
       const map = await service.beatMapFor(track.trackId);
       if (token !== buildToken.current) return;
 
@@ -166,6 +190,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [build, catalogue.catalogue, media, selectedTrack],
   );
 
+  const chooseTrack = useCallback(
+    async (track: CatalogueTrack) => {
+      setSelectedTrack(track);
+      // A template already chosen means the user is switching tracks mid-flow: rebuild, so
+      // the preview they return to is cut against the track they just picked.
+      if (selectedTemplate && media.length >= 3) {
+        await build(selectedTemplate, track, media);
+      }
+    },
+    [build, media, selectedTemplate],
+  );
+
+  const chooseLocalTrack = useCallback(
+    async (analysed: AnalysedLocalTrack) => {
+      localTrackRef.current = analysed;
+      setLocalTrack(analysed);
+      await chooseTrack(analysed.track);
+    },
+    [chooseTrack],
+  );
+
   const shuffle = useCallback(() => {
     setShuffleSeed((seed) => seed + 1);
   }, []);
@@ -183,10 +228,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       cutList,
       media,
       audioPlan,
+      localTrack,
       notice,
       loadCatalogue,
       retryCatalogue,
       chooseTemplate,
+      chooseTrack,
+      chooseLocalTrack,
       shuffle,
       clearNotice: () => setNotice("none"),
     }),
@@ -194,9 +242,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       audioPlan,
       beatMap,
       catalogue,
+      chooseLocalTrack,
       chooseTemplate,
+      chooseTrack,
       cutList,
       loadCatalogue,
+      localTrack,
       media,
       notice,
       retryCatalogue,

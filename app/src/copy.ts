@@ -105,11 +105,15 @@ export const COPY = {
     audioUnavailable: "We couldn't load the track, so you'll hear a click on each beat.",
   },
 
-  // --- Export (spec 06 §6) ----------------------------------------------------------------------
+  // --- Export (spec 06 §6, spec 09 §5) ----------------------------------------------------------
   render: {
     preparing: "Getting your media ready",
     rendering: "Rendering your reel.",
     cancel: "Cancel",
+    /** RF1 — a royalty-free track is fetched just before rendering. */
+    fetchingTrack: "Fetching the track",
+    /** RF2 */
+    audioUnavailable: "We couldn't fetch the track. Check your connection and try again.",
     /** R1 */
     storageFull: "Not enough storage. Free up about 200 MB and try again.",
     /** R2 */
@@ -133,7 +137,7 @@ export const COPY = {
     returnToPreview: "Return to preview",
   },
 
-  // --- Share (spec 07 §6) --------------------------------------------------------------------------
+  // --- Share (spec 07 §6, spec 10 §5) ----------------------------------------------------------------
   share: {
     title: "Your reel",
     shareToInstagram: "Share to Instagram",
@@ -149,6 +153,31 @@ export const COPY = {
     savePermissionDenied: "ThumpCut needs permission to save to your gallery.",
     /** I4 */
     fileGone: "That reel is no longer available. Please export again.",
+    /** Spec 10 — reels that carry their own music. */
+    shareToYouTube: "Share to YouTube",
+    shareAnywhere: "Share anywhere",
+    musicIncluded: "The music is in the video — share it anywhere.",
+    /** Y1 */
+    youtubeFailed: "Couldn't open YouTube. You can save the reel and share it manually.",
+    /** Y2 */
+    shareFailed: "Couldn't share the reel. You can save it and share it manually.",
+  },
+
+  // --- Your music (spec 08 §5) ------------------------------------------------------------------------
+  music: {
+    title: "Your music",
+    explainer: "Use any song saved on your phone. Royalty-free music is safest to post.",
+    /** L1 */
+    permissionDenied: "ThumpCut needs access to your music to read its beat.",
+    openSettings: "Open Settings",
+    /** L2 */
+    empty: "No songs on this device. Download a royalty-free track and it will show up here.",
+    /** L3 — analysis progress. The number is appended live. */
+    analysing: "Reading the beat",
+    /** L4 */
+    analysisFailed: "We couldn't read a beat in that song. Try a different one.",
+    unknownArtist: "Your music",
+    yourMusic: "Your music",
   },
 
   // --- Settings (design brief §9) ---------------------------------------------------------------------
@@ -236,4 +265,14 @@ export function formatTemplateMeta(bpm: number, range: readonly [number, number]
 /** `MADE FOR 9 ITEMS` */
 export function formatMadeFor(itemCount: number): string {
   return `${COPY.recommended.madeForPrefix} ${itemCount} ${COPY.recommended.madeForSuffix}`;
+}
+
+/**
+ * `Music: Night Meter — ThumpCut Test Kit (CC BY)` — the credit a Creative Commons licence
+ * asks a poster to carry. Shown on the share screen for royalty-free tracks, so the user can
+ * copy it into their caption.
+ */
+export function formatTrackCredit(title: string, artist: string, licenceName: string): string {
+  const by = artist ? ` — ${artist}` : "";
+  return `Music: ${title}${by} (${licenceName})`;
 }

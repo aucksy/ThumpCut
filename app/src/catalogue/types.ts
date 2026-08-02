@@ -7,6 +7,25 @@
 
 import type { BeatMap, Template } from "@thumpcut/cut-engine";
 
+/**
+ * Where a track's recording comes from, which decides everything downstream: an `instagram`
+ * track exports silent and hands off to Instagram, which supplies the music; a `royaltyfree`
+ * track's licence permits the music inside the exported file, so it shares anywhere; a
+ * `local` track is the user's own file, analysed on the device, and also shares anywhere.
+ * Only the first two ever appear in a published catalogue — `local` exists on the phone
+ * alone. Absent on catalogues published before this field existed — treated as `instagram`,
+ * which is what they all were.
+ */
+export type TrackSource = "instagram" | "royaltyfree" | "local";
+
+/** The licence a royalty-free track is offered under. Shown, and carried into the credit. */
+export interface TrackLicence {
+  /** Short display name, e.g. `CC BY`. */
+  name: string;
+  /** The licence deed the credit should link to. */
+  url: string;
+}
+
 export interface CatalogueTrack {
   trackId: string;
   title: string;
@@ -17,6 +36,14 @@ export interface CatalogueTrack {
   contentHash: string;
   /** Relative to the catalogue URL, e.g. `beatmaps/17841400008460056.json`. */
   beatMapPath: string;
+  source?: TrackSource;
+  licence?: TrackLicence;
+}
+
+/** The effective source, with the pre-field catalogues read as what they were. */
+export function trackSource(track: Pick<CatalogueTrack, "source">): TrackSource {
+  if (track.source === "royaltyfree" || track.source === "local") return track.source;
+  return "instagram";
 }
 
 export type TemplateMood = "Chill" | "Upbeat" | "Hype" | "Cinematic";

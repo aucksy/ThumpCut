@@ -1,13 +1,16 @@
 /**
  * Share.
  *
- * When Instagram is not installed the button is **absent**, not greyed out. A disabled button
+ * Two shapes, decided by what is inside the file. A silent reel cut for an Instagram track
+ * gets the Instagram handoff — Instagram supplies the music, so it is the only destination
+ * that makes the reel whole. A reel that carries its own music (the user's, or royalty-free)
+ * gets YouTube and the system share sheet instead, and never the Instagram-only framing.
+ *
+ * When an app is not installed its button is **absent**, not greyed out. A disabled button
  * is a promise the app cannot keep and the user has no way to understand.
  *
- * The line underneath — "Pick your track in Instagram — you'll get the full library." — does
- * real work. It sets the expectation for the one manual step and reframes a limitation as an
- * advantage. It is also the payoff for the metronome preview: the user has been watching cuts
- * land on clicks, and this is where the actual song arrives. It gets presence, not a footnote.
+ * The line underneath does real work in both shapes: it either sets the expectation for the
+ * one manual step in Instagram, or says plainly that the music is already in the file.
  */
 
 import { Image } from "expo-image";
@@ -33,6 +36,8 @@ export interface ShareScreenProps {
   durationSec: number;
   onBack?: () => void;
   onShare?: () => void;
+  onShareYouTube?: () => void;
+  onShareAnywhere?: () => void;
   onSave?: () => void;
   onOpenSettings?: () => void;
 }
@@ -48,11 +53,15 @@ export function ShareScreen({
   durationSec,
   onBack,
   onShare,
+  onShareYouTube,
+  onShareAnywhere,
   onSave,
   onOpenSettings,
 }: ShareScreenProps) {
   const fileGone = snapshot.videoUri === null;
   const needsSettings = snapshot.message === COPY.share.savePermissionDenied;
+  const anywhere = snapshot.mode === "anywhere";
+  const hasPrimary = anywhere || snapshot.instagramAvailable;
 
   return (
     <Screen testID="screen-share">
@@ -105,22 +114,42 @@ export function ShareScreen({
                 <Toast>{snapshot.message}</Toast>
               </View>
             ) : null}
-            {snapshot.instagramAvailable ? (
+            {!anywhere && snapshot.instagramAvailable ? (
               <Button full onPress={onShare} testID="share-instagram">
                 {COPY.share.shareToInstagram}
               </Button>
             ) : null}
+            {anywhere && snapshot.youtubeAvailable ? (
+              <Button full onPress={onShareYouTube} testID="share-youtube">
+                {COPY.share.shareToYouTube}
+              </Button>
+            ) : null}
+            {anywhere ? (
+              <Button
+                full
+                variant={snapshot.youtubeAvailable ? "secondary" : "primary"}
+                onPress={onShareAnywhere}
+                testID="share-anywhere"
+              >
+                {COPY.share.shareAnywhere}
+              </Button>
+            ) : null}
             <Button
               full
-              variant={snapshot.instagramAvailable ? "secondary" : "primary"}
+              variant={hasPrimary ? "secondary" : "primary"}
               onPress={onSave}
               testID="share-save"
             >
               {COPY.share.saveToGallery}
             </Button>
             <Body style={styles.pickTrack} testID="share-pick-track">
-              {COPY.share.pickYourTrack}
+              {anywhere ? COPY.share.musicIncluded : COPY.share.pickYourTrack}
             </Body>
+            {anywhere && snapshot.credit ? (
+              <Body selectable style={styles.credit} testID="share-credit">
+                {snapshot.credit}
+              </Body>
+            ) : null}
           </View>
         </>
       )}
@@ -147,6 +176,15 @@ const styles = StyleSheet.create({
     color: alpha.bone70,
     paddingHorizontal: space.s3,
     paddingTop: space.s2,
+  },
+  // Selectable on purpose: this is the line a CC licence asks the poster to carry, and the
+  // easiest way to honour it is to long-press and copy it into the caption.
+  credit: {
+    textAlign: "center",
+    fontSize: 12,
+    lineHeight: 12 * 1.5,
+    color: alpha.bone70,
+    paddingHorizontal: space.s3,
   },
   toastRow: { alignItems: "center", paddingBottom: space.s2 },
 });

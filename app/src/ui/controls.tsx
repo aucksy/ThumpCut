@@ -103,6 +103,7 @@ interface ChipProps {
   selected?: boolean;
   onPress?: () => void;
   style?: ViewStyle;
+  testID?: string;
 }
 
 /**
@@ -112,13 +113,14 @@ interface ChipProps {
  * press is 44pt — the minimum tap target. Those two numbers are allowed to differ, and on a
  * phone held one-handed the difference is the whole reason the filter feels reliable.
  */
-export function Chip({ children, selected = false, onPress, style }: ChipProps) {
+export function Chip({ children, selected = false, onPress, style, testID }: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
       style={styles.chipTouch}
+      testID={testID}
     >
       <View style={[styles.chip, selected ? styles.chipSelected : styles.chipIdle, style]}>
         <Text style={[styles.chipLabel, selected ? styles.chipLabelSelected : null]}>

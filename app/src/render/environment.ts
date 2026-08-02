@@ -25,6 +25,11 @@ const KEEP_AWAKE_TAG = "thumpcut-render";
 const BYTES_PER_SECOND = 1_400_000;
 const MINIMUM_HEADROOM_BYTES = 200 * 1024 * 1024;
 const OUTPUT_NAME = "thumpcut-reel.mp4";
+/**
+ * No timestamp for the same reason as the reel: a leftover from a killed export is
+ * overwritten rather than accumulating, and the orchestrator deletes it when a run ends.
+ */
+const AUDIO_NAME = "thumpcut-export-track.m4a";
 
 export function createRenderEnvironment(): RenderEnvironment {
   return {
@@ -59,6 +64,7 @@ export function createRenderEnvironment(): RenderEnvironment {
           request.media,
           request.outputPath,
           request.onProgress,
+          request.audio,
         );
       } catch (error) {
         if (error instanceof RendererUnavailableError) {
@@ -106,6 +112,27 @@ export function createRenderEnvironment(): RenderEnvironment {
     keepAwake(on: boolean) {
       if (on) void activateKeepAwakeAsync(KEEP_AWAKE_TAG);
       else deactivateKeepAwake(KEEP_AWAKE_TAG);
+    },
+
+    async fetchAudio(url: string, toPath: string) {
+      const destination = new File(toPath);
+      if (destination.exists) destination.delete();
+      await File.downloadFileAsync(url, destination);
+      if (!destination.exists || (destination.size ?? 0) === 0) {
+        throw new Error("the track arrived empty");
+      }
+    },
+
+    makeAudioPath() {
+      return new File(Paths.cache, AUDIO_NAME).uri;
+    },
+
+    async fileExists(path: string) {
+      try {
+        return new File(path).exists;
+      } catch {
+        return false;
+      }
     },
   };
 }

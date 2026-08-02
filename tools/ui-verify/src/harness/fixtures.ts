@@ -9,7 +9,7 @@
  * screenshot that goes blank in CI.
  */
 
-import type { CatalogueTemplate } from "../../../../app/src/catalogue/types.ts";
+import type { CatalogueTemplate, CatalogueTrack } from "../../../../app/src/catalogue/types.ts";
 import type { LibraryItem, SelectionState } from "../../../../app/src/media/selection.ts";
 import { initialSelectionState } from "../../../../app/src/media/selection.ts";
 
@@ -189,3 +189,68 @@ export const SAMPLE_TRACK = {
   artist: "Arjun Rao",
   tempo: "124 BPM",
 };
+
+/** The track chooser's three neighbourhoods: trending, royalty-free, and the local door. */
+export const SAMPLE_TRACK_LIST: CatalogueTrack[] = [
+  {
+    trackId: "ig-1",
+    title: "Night Meter",
+    artist: "Arjun Rao",
+    bpm: 124,
+    durationSec: 41,
+    contentHash: "hash-1",
+    beatMapPath: "beatmaps/ig-1.json",
+  },
+  {
+    trackId: "ig-2",
+    title: "Slow Tide",
+    artist: "Mara Lund",
+    bpm: 96,
+    durationSec: 40,
+    contentHash: "hash-2",
+    beatMapPath: "beatmaps/ig-2.json",
+  },
+  {
+    trackId: "jam-168",
+    title: "Golden Static",
+    artist: "The Wire Choir",
+    bpm: 118,
+    durationSec: 187,
+    contentHash: "hash-3",
+    beatMapPath: "beatmaps/jam-168.json",
+    source: "royaltyfree",
+    licence: { name: "CC BY", url: "https://creativecommons.org/licenses/by/4.0/" },
+  },
+  {
+    trackId: "jam-403",
+    title: "Redline Hours",
+    artist: "Field Notes",
+    bpm: 150,
+    durationSec: 203,
+    contentHash: "hash-4",
+    beatMapPath: "beatmaps/jam-403.json",
+    source: "royaltyfree",
+    licence: { name: "CC BY-SA", url: "https://creativecommons.org/licenses/by-sa/4.0/" },
+  },
+];
+
+/** A local track as it looks once analysed on the device. */
+export const SAMPLE_LOCAL_TRACK: CatalogueTrack = {
+  trackId: "local-9f2c41ab08d3",
+  title: "Monsoon Sketch",
+  artist: "Your music",
+  bpm: 104,
+  durationSec: 214,
+  contentHash: "hash-local",
+  beatMapPath: "",
+  source: "local",
+};
+
+/** The phone's own songs, as the scan finds them. */
+export const SAMPLE_SONGS = [
+  { id: "s1", uri: "file:///music/1.mp3", filename: "Monsoon Sketch.mp3", durationSec: 214, modifiedAt: 1 },
+  { id: "s2", uri: "file:///music/2.mp3", filename: "01 - Night_Drive_Demo.mp3", durationSec: 187, modifiedAt: 2 },
+  { id: "s3", uri: "file:///music/3.m4a", filename: "voice memo loop.m4a", durationSec: 96, modifiedAt: 3 },
+  { id: "s4", uri: "file:///music/4.mp3", filename: "Redline Hours (Field Notes).mp3", durationSec: 203, modifiedAt: 4 },
+  { id: "s5", uri: "file:///music/5.mp3", filename: "kirtan practice take 3.mp3", durationSec: 312, modifiedAt: 5 },
+];

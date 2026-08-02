@@ -14,8 +14,22 @@ import type { NativeCut } from "../../../src/render/nativeCuts.ts";
 export type { NativeCut } from "../../../src/render/nativeCuts.ts";
 export { toNativeCuts } from "../../../src/render/nativeCuts.ts";
 
+/**
+ * The music an export may carry. Never present for a track from Instagram's catalogue —
+ * those exports are silent for ever, for licensing reasons that are not up for revision.
+ * Present only for the user's own music and for royalty-free tracks whose licence allows it.
+ */
+export interface RenderAudio {
+  /** A local file the renderer can read. Remote URLs are fetched before this is built. */
+  uri: string;
+  /** Where in the track the reel starts — the same offset the preview played from. */
+  startSec: number;
+  /** Exactly the reel's length, so the sound ends when the picture does. */
+  durationSec: number;
+}
+
 export interface ReelRenderNativeModule {
-  render(cuts: NativeCut[], outputPath: string): Promise<number>;
+  render(cuts: NativeCut[], outputPath: string, audio: RenderAudio | null): Promise<number>;
   cancel(): Promise<void>;
   probe(path: string): Promise<{
     durationSec: number;
@@ -45,13 +59,14 @@ export async function render(
   media: MediaItem[],
   outputPath: string,
   onProgress: (fraction: number) => void,
+  audio: RenderAudio | null = null,
 ): Promise<number> {
   if (!native) throw new RendererUnavailableError();
   const subscription = native.addListener("onProgress", (payload) => {
     onProgress(payload.fraction);
   });
   try {
-    return await native.render(toNativeCuts(cutList, media), outputPath);
+    return await native.render(toNativeCuts(cutList, media), outputPath, audio);
   } finally {
     subscription.remove();
   }

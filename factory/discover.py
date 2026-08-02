@@ -44,7 +44,7 @@ class DiscoveryFailed(RuntimeError):
 
 @dataclass(frozen=True)
 class DiscoveredTrack:
-    """One track as Meta describes it, before any audio is fetched."""
+    """One track as its source describes it, before any audio is fetched."""
 
     audio_id: str
     title: str
@@ -53,6 +53,16 @@ class DiscoveredTrack:
     download_url: str
     # Set for fixture tracks: read the bytes from here instead of over the network.
     local_path: Path | None = None
+    # Where the track comes from. "instagram" exports silent and hands off to Instagram;
+    # "royaltyfree" carries a licence that permits the music inside the exported file.
+    source: str = "instagram"
+    # Royalty-free only: the short licence name ("CC BY") and its deed URL. Both empty for
+    # every other source.
+    licence_name: str = ""
+    licence_url: str = ""
+    # Royalty-free only: this source's links do not expire on a clock, so the app's audio
+    # index publishes them without an expiry.
+    stable_link: bool = False
 
     @property
     def is_fixture(self) -> bool:

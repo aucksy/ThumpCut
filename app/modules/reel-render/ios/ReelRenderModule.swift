@@ -26,7 +26,7 @@ public class ReelRenderModule: Module {
 
     Events("onProgress")
 
-    AsyncFunction("render") { (cuts: [[String: Any]], outputPath: String) -> Double in
+    AsyncFunction("render") { (cuts: [[String: Any]], outputPath: String, audio: [String: Any]?) -> Double in
       self.cancelled = false
 
       let composition = AVMutableComposition()
@@ -86,6 +86,31 @@ public class ReelRenderModule: Module {
         }
 
         cursor = CMTimeAdd(cursor, duration)
+      }
+
+      // The music, when the export is allowed to carry any. Instagram-catalogue tracks are
+      // never handed in here — their exports stay silent for ever. This path exists for the
+      // user's own music and royalty-free tracks whose licence permits it.
+      if let audio = audio, let audioUri = audio["uri"] as? String {
+        let startSec = audio["startSec"] as? Double ?? 0
+        let audioDurationSec = audio["durationSec"] as? Double ?? 0
+        if audioDurationSec > 0 {
+          let audioAsset = AVURLAsset(url: URL(
+            fileURLWithPath: audioUri.replacingOccurrences(of: "file://", with: "")
+          ))
+          if let sourceAudio = try? await audioAsset.loadTracks(withMediaType: .audio).first,
+             let audioTrack = composition.addMutableTrack(
+               withMediaType: .audio,
+               preferredTrackID: kCMPersistentTrackID_Invalid
+             ) {
+            let range = CMTimeRange(
+              start: CMTime(seconds: startSec, preferredTimescale: 600),
+              duration: CMTime(seconds: min(audioDurationSec, CMTimeGetSeconds(cursor)),
+                               preferredTimescale: 600)
+            )
+            try audioTrack.insertTimeRange(range, of: sourceAudio, at: .zero)
+          }
+        }
       }
 
       instruction.timeRange = CMTimeRange(start: .zero, duration: cursor)

@@ -1,21 +1,27 @@
 /**
- * Recommended templates.
+ * Recommended templates, and the track chooser above them.
  *
  * The user picked N items; these are the styles that will produce good timing for N items. It
  * is arithmetic on cached data, so it is instant.
  *
  * Everything else sits below a divider labelled "Also works" — **shown, not hidden**. The user
  * can always pick anything; the app is offering an opinion, not making a decision.
+ *
+ * The track row carries three neighbourhoods: the phone's own music, Instagram's trending
+ * tracks, and the royalty-free section. Which one the reel is cut against decides how it can
+ * be shared at the end, and the chips say so quietly — a licence name on a royalty-free
+ * track, nothing on the rest.
  */
 
 import { ScrollView, StyleSheet, View } from "react-native";
 import { layout, space } from "@thumpcut/design-tokens";
 import { COPY, formatMadeFor, formatSelectionHeader, formatTemplateMeta } from "../copy.ts";
-import type { CatalogueTemplate } from "../catalogue/types.ts";
+import type { CatalogueTemplate, CatalogueTrack } from "../catalogue/types.ts";
 import type { Recommendation } from "../templates/recommend.ts";
 import { DividerLabel } from "../ui/controls.tsx";
 import { Screen, TopBar } from "../ui/chrome.tsx";
 import { TemplateCard } from "../ui/TemplateCard.tsx";
+import { TrackStrip } from "../ui/TrackStrip.tsx";
 import { Label, Mono } from "../ui/text.tsx";
 import { HERO_RULER } from "../ui/heroRuler.ts";
 
@@ -26,6 +32,12 @@ export interface RecommendedScreenProps {
   bpmForTemplate?: (template: CatalogueTemplate) => number;
   onBack?: () => void;
   onSelectTemplate?: (template: CatalogueTemplate) => void;
+  /** The track chooser. Absent props keep the screen exactly as it was. */
+  tracks?: CatalogueTrack[];
+  selectedTrackId?: string | null;
+  onSelectTrack?: (track: CatalogueTrack) => void;
+  onYourMusic?: () => void;
+  localTrack?: CatalogueTrack | null;
 }
 
 export function RecommendedScreen({
@@ -35,6 +47,11 @@ export function RecommendedScreen({
   bpmForTemplate,
   onBack,
   onSelectTemplate,
+  tracks,
+  selectedTrackId,
+  onSelectTrack,
+  onYourMusic,
+  localTrack,
 }: RecommendedScreenProps) {
   const card = (template: CatalogueTemplate) => (
     <View key={template.id} style={styles.cell}>
@@ -62,6 +79,18 @@ export function RecommendedScreen({
         center={<Mono numberOfLines={1}>{formatSelectionHeader(itemCount, clipCount)}</Mono>}
       />
 
+      {tracks && tracks.length > 0 ? (
+        <View style={styles.trackRow}>
+          <TrackStrip
+            tracks={tracks}
+            selectedTrackId={selectedTrackId}
+            onSelectTrack={onSelectTrack}
+            onYourMusic={onYourMusic}
+            localTrack={localTrack}
+          />
+        </View>
+      ) : null}
+
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Label style={styles.madeFor} testID="recommended-heading">
           {formatMadeFor(itemCount)}
@@ -84,6 +113,7 @@ export function RecommendedScreen({
 }
 
 const styles = StyleSheet.create({
+  trackRow: { paddingLeft: layout.screenPad, paddingTop: space.s2 },
   scroll: { paddingHorizontal: layout.screenPad, paddingTop: space.s2, paddingBottom: 40 },
   madeFor: { marginBottom: space.s3 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.s3 },

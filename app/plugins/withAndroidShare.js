@@ -22,7 +22,21 @@ const path = require("node:path");
 
 const { withAndroidManifest, withDangerousMod } = require("expo/config-plugins");
 
-const INSTAGRAM_PACKAGE = "com.instagram.android";
+/**
+ * Every app the share screen may need to *detect*. From Android 11, `queryIntentActivities`
+ * only sees an app declared here — a package missing from this list reports "not installed"
+ * on a phone where it is on the home screen, silently. Launching needs no declaration; only
+ * showing or hiding a button does, and that is exactly what the share screen does.
+ *
+ * TikTok ships under two package names depending on region; both are declared so detection
+ * works wherever the phone was bought.
+ */
+const VISIBLE_PACKAGES = [
+  "com.instagram.android",
+  "com.google.android.youtube",
+  "com.zhiliaoapp.musically",
+  "com.ss.android.ugc.trill",
+];
 const FILE_PROVIDER_AUTHORITY_SUFFIX = ".fileprovider";
 const PATHS_RESOURCE = "thumpcut_file_paths";
 
@@ -97,7 +111,7 @@ function withFileProvider(config) {
   });
 }
 
-function withInstagramVisible(config) {
+function withShareTargetsVisible(config) {
   return withAndroidManifest(config, (mod) => {
     const manifest = mod.modResults.manifest;
 
@@ -106,11 +120,13 @@ function withInstagramVisible(config) {
     const queries = manifest.queries[0];
 
     queries.package = queries.package ?? [];
-    const already = queries.package.some(
-      (entry) => entry.$?.["android:name"] === INSTAGRAM_PACKAGE,
-    );
-    if (!already) {
-      queries.package.push({ $: { "android:name": INSTAGRAM_PACKAGE } });
+    for (const packageName of VISIBLE_PACKAGES) {
+      const already = queries.package.some(
+        (entry) => entry.$?.["android:name"] === packageName,
+      );
+      if (!already) {
+        queries.package.push({ $: { "android:name": packageName } });
+      }
     }
 
     return mod;
@@ -118,5 +134,5 @@ function withInstagramVisible(config) {
 }
 
 module.exports = function withAndroidShare(config) {
-  return withInstagramVisible(withFileProvider(withFileProviderPaths(config)));
+  return withShareTargetsVisible(withFileProvider(withFileProviderPaths(config)));
 };

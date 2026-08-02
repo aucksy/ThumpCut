@@ -14,6 +14,8 @@ import * as MediaLibrary from "expo-media-library";
 import Constants from "expo-constants";
 import { ShareScreen } from "../src/screens/index.tsx";
 import { useAppState } from "../src/state/AppState.tsx";
+import { trackSource } from "../src/catalogue/index.ts";
+import { formatTrackCredit } from "../src/copy.ts";
 import { markersForCuts } from "../src/templates/recommend.ts";
 import {
   SaveError,
@@ -21,7 +23,14 @@ import {
   type ShareEnvironment,
   type ShareSnapshot,
 } from "../src/share/controller.ts";
-import { isAvailable, shareToReels } from "../modules/instagram-share/src/index.ts";
+import {
+  isAvailable,
+  isPackageAvailable,
+  shareSystem,
+  shareToPackage,
+  shareToReels,
+  YOUTUBE_PACKAGE,
+} from "../modules/instagram-share/src/index.ts";
 
 const META_APP_ID =
   (Constants.expoConfig?.extra as { metaAppId?: string } | undefined)?.metaAppId ?? "";
@@ -35,6 +44,9 @@ function createShareEnvironment(): ShareEnvironment {
     // setting.
     isInstagramAvailable: async () => META_APP_ID !== "" && (await isAvailable()),
     shareToReels: (videoUri) => shareToReels(videoUri, META_APP_ID),
+    isYouTubeAvailable: () => isPackageAvailable(YOUTUBE_PACKAGE),
+    shareToYouTube: (videoUri) => shareToPackage(videoUri, YOUTUBE_PACKAGE),
+    shareAnywhere: (videoUri) => shareSystem(videoUri),
     async saveToGallery(videoUri) {
       const permission = await MediaLibrary.requestPermissionsAsync();
       if (!permission.granted) throw new SaveError("permission", "denied");
@@ -59,10 +71,23 @@ function createShareEnvironment(): ShareEnvironment {
 export default function ShareRoute() {
   const router = useRouter();
   const { uri } = useLocalSearchParams<{ uri?: string }>();
-  const { beatMap, cutList, media } = useAppState();
+  const { beatMap, cutList, media, selectedTrack } = useAppState();
 
   const controller = useRef(
-    new ShareController(createShareEnvironment(), uri ?? null),
+    new ShareController(createShareEnvironment(), uri ?? null, {
+      // The file decides the buttons: a silent Instagram-track reel gets the Instagram
+      // handoff; a reel carrying its own music gets YouTube and the system sheet.
+      mode:
+        selectedTrack && trackSource(selectedTrack) !== "instagram" ? "anywhere" : "instagram",
+      credit:
+        selectedTrack && trackSource(selectedTrack) === "royaltyfree" && selectedTrack.licence
+          ? formatTrackCredit(
+              selectedTrack.title,
+              selectedTrack.artist,
+              selectedTrack.licence.name,
+            )
+          : null,
+    }),
   ).current;
   const [snapshot, setSnapshot] = useState<ShareSnapshot>(controller.snapshot());
 
@@ -93,6 +118,8 @@ export default function ShareRoute() {
       durationSec={cutList?.totalDurationSec ?? 1}
       onBack={() => router.back()}
       onShare={() => void controller.shareToInstagram()}
+      onShareYouTube={() => void controller.shareToYouTube()}
+      onShareAnywhere={() => void controller.shareAnywhere()}
       onSave={() => void controller.saveToGallery()}
       onOpenSettings={() => void controller.openSettings()}
     />

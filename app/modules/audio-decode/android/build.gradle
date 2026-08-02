@@ -1,0 +1,22 @@
+// The Android half of the audio decoder.
+//
+// Decodes a song file into raw samples for the on-device beat engine. Everything it needs —
+// MediaExtractor, MediaCodec, MediaMetadataRetriever — ships with the platform, so there are
+// no dependencies to pin here. The file still has to exist, or the module has Kotlin source
+// and no way to compile it, and the app builds with "Your music" silently broken.
+
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.audiodecode'
+version = '0.1.0'
+
+android {
+  namespace 'expo.modules.audiodecode'
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}

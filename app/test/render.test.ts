@@ -262,6 +262,38 @@ describe("spec 06 §2.1 — the export gate", () => {
   });
 });
 
+describe("spec 09 §2.1 — the export gate when the reel carries its music", () => {
+  it("passes a file with exactly one audio track", () => {
+    const result = validateExport(makeMp4({ withAudioTrack: true, durationSec: 12 }), 12, {
+      expectAudio: true,
+    });
+    assert.deepEqual(result.failures, []);
+    assert.equal(result.valid, true);
+  });
+
+  it("fails a silent file — a reel built to carry its music must not come out mute", () => {
+    const result = validateExport(makeMp4({ durationSec: 12 }), 12, { expectAudio: true });
+    assert.equal(result.valid, false);
+    assert.ok(result.failures.some((failure) => failure.includes("expected exactly one audio")));
+  });
+
+  it("still enforces every video rule with audio present", () => {
+    const result = validateExport(
+      makeMp4({ withAudioTrack: true, withEditList: true, durationSec: 12 }),
+      12,
+      { expectAudio: true },
+    );
+    assert.equal(result.valid, false);
+    assert.ok(result.failures.some((failure) => failure.includes("edit list")));
+  });
+
+  it("the silent mode is untouched: an audio track still fails it", () => {
+    const result = validateExport(makeMp4({ withAudioTrack: true }), 10);
+    assert.equal(result.valid, false);
+    assert.ok(result.failures.some((failure) => failure.includes("it must carry none")));
+  });
+});
+
 // ---------------------------------------------------------------------------
 // The orchestrator
 // ---------------------------------------------------------------------------
@@ -342,6 +374,20 @@ class FakeEnvironment implements RenderEnvironment {
   }
   keepAwake(on: boolean) {
     this.awake.push(on);
+  }
+  fetchCalls: string[] = [];
+  fetchThrows = false;
+  present = new Set<string>();
+  async fetchAudio(url: string, toPath: string) {
+    this.fetchCalls.push(url);
+    if (this.fetchThrows) throw new Error("network");
+    this.present.add(toPath);
+  }
+  makeAudioPath() {
+    return "/tmp/track.m4a";
+  }
+  async fileExists(path: string) {
+    return this.present.has(path);
   }
 }
 
@@ -479,6 +525,89 @@ describe("the export flow", () => {
 
     assert.equal(result.status, "Failed");
     assert.deepEqual(environment.deleted, ["/tmp/reel.mp4"]);
+  });
+});
+
+describe("the export flow when the reel carries its music", () => {
+  it("hands the user's own file straight to the renderer, offset and length included", async () => {
+    const environment = new FakeEnvironment();
+    environment.output = makeMp4({ withAudioTrack: true, durationSec: 10 });
+    let received: unknown = "never set";
+    environment.onRender = (request) => {
+      received = (request as { audio?: unknown }).audio;
+    };
+    const result = await new RenderController(environment).start(cutList(10), media(5), {
+      kind: "file",
+      uri: "file:///music/song.mp3",
+      audioStartSec: 12.5,
+    });
+
+    assert.equal(result.status, "Complete");
+    assert.deepEqual(received, {
+      uri: "file:///music/song.mp3",
+      startSec: 12.5,
+      durationSec: 10,
+    });
+    assert.equal(environment.fetchCalls.length, 0, "a local file is never fetched");
+  });
+
+  it("fetches a royalty-free track first, and deletes the copy when the run ends", async () => {
+    const environment = new FakeEnvironment();
+    environment.output = makeMp4({ withAudioTrack: true, durationSec: 10 });
+    const result = await new RenderController(environment).start(cutList(10), media(5), {
+      kind: "remote",
+      url: "https://example.com/track.mp3",
+      audioStartSec: 4,
+    });
+
+    assert.equal(result.status, "Complete");
+    assert.deepEqual(environment.fetchCalls, ["https://example.com/track.mp3"]);
+    assert.ok(environment.deleted.includes("/tmp/track.m4a"), "the transient copy is deleted");
+  });
+
+  it("fails with the exact text when the track cannot be fetched, before any rendering", async () => {
+    const environment = new FakeEnvironment();
+    environment.fetchThrows = true;
+    const result = await new RenderController(environment).start(cutList(10), media(5), {
+      kind: "remote",
+      url: "https://example.com/track.mp3",
+      audioStartSec: 0,
+    });
+
+    assert.equal(result.status, "Failed");
+    assert.equal(result.error, "We couldn't fetch the track. Check your connection and try again.");
+    assert.equal(environment.renderCalls, 0);
+  });
+
+  it("keeps the fetched track across the out-of-memory retry", async () => {
+    const environment = new FakeEnvironment();
+    environment.output = makeMp4({ withAudioTrack: true, durationSec: 10 });
+    environment.failOnce = new NativeRenderError("outOfMemory", "oom");
+    const result = await new RenderController(environment).start(cutList(10), media(5), {
+      kind: "remote",
+      url: "https://example.com/track.mp3",
+      audioStartSec: 0,
+    });
+
+    assert.equal(result.status, "Complete");
+    assert.equal(environment.renderCalls, 2);
+    assert.equal(environment.fetchCalls.length, 1, "fetched once, not once per attempt");
+  });
+
+  it("a silent reel that comes out carrying audio is rejected, and the reverse", async () => {
+    const environment = new FakeEnvironment();
+    environment.output = makeMp4({ withAudioTrack: true, durationSec: 10 });
+    const silent = await new RenderController(environment).start(cutList(10), media(5));
+    assert.equal(silent.status, "Failed");
+
+    const environment2 = new FakeEnvironment();
+    environment2.output = makeMp4({ durationSec: 10 });
+    const withMusic = await new RenderController(environment2).start(cutList(10), media(5), {
+      kind: "file",
+      uri: "file:///music/song.mp3",
+      audioStartSec: 0,
+    });
+    assert.equal(withMusic.status, "Failed");
   });
 });
 

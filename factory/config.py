@@ -47,10 +47,17 @@ MIN_TRACK_SECONDS = 10.0
 MIN_BPM = 50.0
 MAX_BPM = 200.0
 
-# Meta Instagram Audio API — spec 01 §2. This host and path are the only audio source.
+# Meta Instagram Audio API — spec 01 §2. The only source for Instagram-catalogue tracks.
 META_GRAPH_HOST = "https://graph.facebook.com"
 META_GRAPH_VERSION = "v21.0"
 META_AUDIO_PATH = "ig_audio"
+
+# Jamendo — spec 09. The royalty-free section's source: Creative Commons music with a read
+# API that needs one free client id and nothing else. Only licences that allow reuse and
+# editing (BY, BY-SA) are ever accepted, and that filter lives in code against each track's
+# licence URL — the API's own licence flags are undocumented enough not to be trusted alone.
+JAMENDO_API_HOST = "https://api.jamendo.com"
+JAMENDO_API_VERSION = "v3.0"
 
 # Network behaviour.
 FETCH_TIMEOUT_SECONDS = 30
@@ -82,7 +89,7 @@ def _load_dotenv(path: Path) -> None:
 
 @dataclass(frozen=True)
 class Credentials:
-    """Meta and Cloudflare R2 credentials. Every field may be empty."""
+    """Meta, Jamendo and Cloudflare R2 credentials. Every field may be empty."""
 
     meta_app_id: str
     meta_app_secret: str
@@ -93,6 +100,13 @@ class Credentials:
     r2_secret_access_key: str
     r2_bucket: str
     r2_public_url: str
+    # Last, and defaulted, so every existing positional construction keeps its meaning.
+    jamendo_client_id: str = ""
+
+    @property
+    def has_jamendo(self) -> bool:
+        """True when the royalty-free section can be built."""
+        return bool(self.jamendo_client_id)
 
     @property
     def has_meta(self) -> bool:
@@ -125,6 +139,7 @@ def load_credentials(env_file: Path | None = None) -> Credentials:
         meta_app_secret=get("META_APP_SECRET", "") or "",
         meta_access_token=get("META_ACCESS_TOKEN", "") or "",
         ig_user_id=get("IG_USER_ID", "") or "",
+        jamendo_client_id=get("JAMENDO_CLIENT_ID", "") or "",
         r2_account_id=get("R2_ACCOUNT_ID", "") or "",
         r2_access_key_id=get("R2_ACCESS_KEY_ID", "") or "",
         r2_secret_access_key=get("R2_SECRET_ACCESS_KEY", "") or "",

@@ -68,6 +68,55 @@ public class InstagramShareModule: Module {
         }
       }
     }
+
+    /**
+     * Can `packageName` accept a video? On iOS the package name is mapped to the app's URL
+     * scheme, which must also be in `LSApplicationQueriesSchemes` or this is false for ever.
+     */
+    AsyncFunction("isPackageAvailable") { (packageName: String) -> Bool in
+      let scheme: String?
+      switch packageName {
+      case "com.google.android.youtube": scheme = "youtube://"
+      default: scheme = nil
+      }
+      guard let scheme, let url = URL(string: scheme) else { return false }
+      return await MainActor.run { UIApplication.shared.canOpenURL(url) }
+    }
+
+    /**
+     * iOS has no direct equivalent of Android's targeted ACTION_SEND — the system sheet is
+     * the platform's own way to hand a file to a named app, so both entry points use it.
+     */
+    AsyncFunction("shareToPackage") { (videoPath: String, _ packageName: String) in
+      try await Self.presentShareSheet(videoPath: videoPath)
+    }
+
+    AsyncFunction("shareSystem") { (videoPath: String) in
+      try await Self.presentShareSheet(videoPath: videoPath)
+    }
+  }
+
+  @MainActor
+  private static func presentShareSheet(videoPath: String) throws {
+    let cleaned = videoPath.replacingOccurrences(of: "file://", with: "")
+    guard FileManager.default.fileExists(atPath: cleaned) else {
+      throw ShareError.fileMissing
+    }
+    let fileUrl = URL(fileURLWithPath: cleaned)
+
+    guard
+      let scene = UIApplication.shared.connectedScenes
+        .compactMap({ $0 as? UIWindowScene }).first,
+      let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+    else {
+      throw ShareError.handoffFailed
+    }
+
+    let sheet = UIActivityViewController(activityItems: [fileUrl], applicationActivities: nil)
+    var top = root
+    while let presented = top.presentedViewController { top = presented }
+    sheet.popoverPresentationController?.sourceView = top.view
+    top.present(sheet, animated: true)
   }
 }
 

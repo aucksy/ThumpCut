@@ -25,10 +25,27 @@ export type ShareStatus =
   | "SaveSuccess"
   | "HandoffFailed";
 
+/**
+ * Which share paths a reel gets, decided by what is inside the file.
+ *
+ * `instagram` — the export is silent and was cut for a track in Instagram's catalogue;
+ * Instagram applies the licensed recording after the handoff, so Instagram is the only
+ * destination that makes the reel whole. `anywhere` — the music is in the file (the user's
+ * own, or royalty-free), so YouTube and the system share sheet are offered instead. A silent
+ * reel is never offered to YouTube: its editor would invite picking a *different* song, and
+ * every cut would miss.
+ */
+export type ShareMode = "instagram" | "anywhere";
+
 export interface ShareSnapshot {
   status: ShareStatus;
+  mode: ShareMode;
   /** S1 — never true unless the platform said so. */
   instagramAvailable: boolean;
+  /** Only ever true in `anywhere` mode, and only when the platform said so. */
+  youtubeAvailable: boolean;
+  /** The artist credit a royalty-free licence asks for, or null when none applies. */
+  credit: string | null;
   /** Exact on-screen text, or null. */
   message: string | null;
   /** The finished file, or null once it has gone. */
@@ -50,12 +67,21 @@ export class SaveError extends Error {
 export interface ShareEnvironment {
   isInstagramAvailable(): Promise<boolean>;
   shareToReels(videoUri: string): Promise<void>;
+  isYouTubeAvailable(): Promise<boolean>;
+  shareToYouTube(videoUri: string): Promise<void>;
+  shareAnywhere(videoUri: string): Promise<void>;
   saveToGallery(videoUri: string): Promise<void>;
   fileExists(videoUri: string): Promise<boolean>;
   openSettings(): Promise<void>;
 }
 
 export type ShareListener = (snapshot: ShareSnapshot) => void;
+
+export interface ShareOptions {
+  mode: ShareMode;
+  /** Shown under the buttons in `anywhere` mode — the credit a CC licence asks for. */
+  credit?: string | null;
+}
 
 export class ShareController {
   private readonly environment: ShareEnvironment;
@@ -64,11 +90,18 @@ export class ShareController {
   /** S3 — one handoff or save at a time. The second waits rather than racing. */
   private busyWith: Promise<void> | null = null;
 
-  constructor(environment: ShareEnvironment, videoUri: string | null) {
+  constructor(
+    environment: ShareEnvironment,
+    videoUri: string | null,
+    options: ShareOptions = { mode: "instagram" },
+  ) {
     this.environment = environment;
     this.snapshotValue = {
       status: "Ready",
+      mode: options.mode,
       instagramAvailable: false,
+      youtubeAvailable: false,
+      credit: options.credit ?? null,
       message: null,
       videoUri,
       busy: false,
@@ -87,14 +120,19 @@ export class ShareController {
 
   /** Called when the share screen appears, and again every time the app is resumed. */
   async refresh(): Promise<ShareSnapshot> {
-    const available = await this.environment.isInstagramAvailable();
+    const anywhere = this.snapshotValue.mode === "anywhere";
+    // Each mode checks only the apps it offers. In `anywhere` mode the Instagram button is
+    // never drawn, so its availability is not asked for — and vice versa.
+    const instagram = anywhere ? false : await this.environment.isInstagramAvailable();
+    const youtube = anywhere ? await this.environment.isYouTubeAvailable() : false;
 
     const uri = this.snapshotValue.videoUri;
     if (uri && !(await this.environment.fileExists(uri))) {
       // I4 — the reel was cleared while the user was away.
       this.emit({
         status: "HandoffFailed",
-        instagramAvailable: available,
+        instagramAvailable: instagram,
+        youtubeAvailable: youtube,
         message: COPY.share.fileGone,
         videoUri: null,
       });
@@ -102,8 +140,9 @@ export class ShareController {
     }
 
     this.emit({
-      status: available ? "Ready" : "InstagramUnavailable",
-      instagramAvailable: available,
+      status: !anywhere && !instagram ? "InstagramUnavailable" : "Ready",
+      instagramAvailable: instagram,
+      youtubeAvailable: youtube,
       message: null,
     });
     return this.snapshotValue;
@@ -144,6 +183,66 @@ export class ShareController {
           message: gone && !(await this.environment.fileExists(uri))
             ? COPY.share.fileGone
             : COPY.share.handoffFailed,
+        });
+      }
+    })();
+
+    this.busyWith = task;
+    try {
+      await task;
+    } finally {
+      this.busyWith = null;
+    }
+    return this.snapshotValue;
+  }
+
+  /** YouTube's upload flow. A vertical reel under three minutes becomes a Short there. */
+  async shareToYouTube(): Promise<ShareSnapshot> {
+    if (!this.snapshotValue.youtubeAvailable) return this.snapshotValue;
+    return this.handOff(
+      (uri) => this.environment.shareToYouTube(uri),
+      COPY.share.youtubeFailed,
+    );
+  }
+
+  /** The system share sheet — every app the phone has. */
+  async shareAnywhere(): Promise<ShareSnapshot> {
+    return this.handOff(
+      (uri) => this.environment.shareAnywhere(uri),
+      COPY.share.shareFailed,
+    );
+  }
+
+  /** The shared handoff shape: busy in, Returned or a failure message out, file kept (S2). */
+  private async handOff(
+    action: (uri: string) => Promise<void>,
+    failureMessage: string,
+  ): Promise<ShareSnapshot> {
+    if (this.busyWith) {
+      await this.busyWith;
+      return this.snapshotValue;
+    }
+    const uri = this.snapshotValue.videoUri;
+    if (!uri) {
+      this.emit({ status: "HandoffFailed", message: COPY.share.fileGone });
+      return this.snapshotValue;
+    }
+
+    const task = (async () => {
+      this.emit({ status: "HandingOff", busy: true, message: null });
+      try {
+        if (!(await this.environment.fileExists(uri))) {
+          throw new SaveError("unknown", "the file is gone");
+        }
+        await action(uri);
+        this.emit({ status: "Returned", busy: false });
+      } catch {
+        this.emit({
+          status: "HandoffFailed",
+          busy: false,
+          message: (await this.environment.fileExists(uri))
+            ? failureMessage
+            : COPY.share.fileGone,
         });
       }
     })();

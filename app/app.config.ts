@@ -43,8 +43,8 @@ const config: ExpoConfig = {
     supportsTablet: false,
     buildNumber: "1",
     infoPlist: {
-      // Without this the Instagram button never appears, and nothing errors.
-      LSApplicationQueriesSchemes: ["instagram-reels", "instagram"],
+      // Without these the Instagram and YouTube buttons never appear, and nothing errors.
+      LSApplicationQueriesSchemes: ["instagram-reels", "instagram", "youtube"],
       NSPhotoLibraryUsageDescription:
         "ThumpCut needs access to your photos to make a reel.",
       NSPhotoLibraryAddUsageDescription:

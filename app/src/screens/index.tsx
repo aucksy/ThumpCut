@@ -10,6 +10,7 @@ export { LaunchScreen, type LaunchScreenProps, type LaunchState } from "./Launch
 export { GalleryScreen, type GalleryScreenProps } from "./Gallery.tsx";
 export { MediaSelectScreen, type MediaSelectScreenProps } from "./MediaSelect.tsx";
 export { RecommendedScreen, type RecommendedScreenProps } from "./Recommended.tsx";
+export { MusicScreen, type MusicScreenProps } from "./Music.tsx";
 export {
   PreviewScreen,
   type PreviewAudioMode,

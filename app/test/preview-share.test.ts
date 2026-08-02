@@ -227,10 +227,15 @@ describe("the metronome", () => {
 
 class FakeShareEnvironment implements ShareEnvironment {
   available = true;
+  youtube = true;
   exists = true;
   shareCalls = 0;
+  youtubeCalls = 0;
+  anywhereCalls = 0;
   saveCalls = 0;
   shareThrows: Error | null = null;
+  youtubeThrows: Error | null = null;
+  anywhereThrows: Error | null = null;
   saveThrows: Error | null = null;
   settingsOpened = 0;
 
@@ -240,6 +245,17 @@ class FakeShareEnvironment implements ShareEnvironment {
   async shareToReels() {
     this.shareCalls += 1;
     if (this.shareThrows) throw this.shareThrows;
+  }
+  async isYouTubeAvailable() {
+    return this.youtube;
+  }
+  async shareToYouTube() {
+    this.youtubeCalls += 1;
+    if (this.youtubeThrows) throw this.youtubeThrows;
+  }
+  async shareAnywhere() {
+    this.anywhereCalls += 1;
+    if (this.anywhereThrows) throw this.anywhereThrows;
   }
   async saveToGallery() {
     this.saveCalls += 1;
@@ -450,6 +466,119 @@ describe("copy rules the design brief sets", () => {
         assert.fail(`"${value}" names Instagram outside the share screen`);
       }
     }
+  });
+});
+
+describe("sharing a reel that carries its own music", () => {
+  it("anywhere mode offers YouTube when it is installed, and never asks about Instagram", async () => {
+    const environment = new FakeShareEnvironment();
+    const controller = new ShareController(environment, "file:///reel.mp4", {
+      mode: "anywhere",
+    });
+    const snapshot = await controller.refresh();
+
+    assert.equal(snapshot.mode, "anywhere");
+    assert.equal(snapshot.youtubeAvailable, true);
+    assert.equal(snapshot.instagramAvailable, false);
+    assert.equal(snapshot.status, "Ready");
+  });
+
+  it("no YouTube installed is a normal state, not a failure", async () => {
+    const environment = new FakeShareEnvironment();
+    environment.youtube = false;
+    const controller = new ShareController(environment, "file:///reel.mp4", {
+      mode: "anywhere",
+    });
+    const snapshot = await controller.refresh();
+
+    assert.equal(snapshot.youtubeAvailable, false);
+    assert.equal(snapshot.status, "Ready");
+  });
+
+  it("hands the reel to YouTube and comes back with both buttons alive", async () => {
+    const environment = new FakeShareEnvironment();
+    const controller = new ShareController(environment, "file:///reel.mp4", {
+      mode: "anywhere",
+    });
+    await controller.refresh();
+    const snapshot = await controller.shareToYouTube();
+
+    assert.equal(environment.youtubeCalls, 1);
+    assert.equal(snapshot.status, "Returned");
+    assert.equal(snapshot.videoUri, "file:///reel.mp4");
+  });
+
+  it("a failed YouTube handoff shows the exact text and keeps the file", async () => {
+    const environment = new FakeShareEnvironment();
+    environment.youtubeThrows = new Error("no");
+    const controller = new ShareController(environment, "file:///reel.mp4", {
+      mode: "anywhere",
+    });
+    await controller.refresh();
+    const snapshot = await controller.shareToYouTube();
+
+    assert.equal(snapshot.status, "HandoffFailed");
+    assert.equal(
+      snapshot.message,
+      "Couldn't open YouTube. You can save the reel and share it manually.",
+    );
+    assert.equal(snapshot.videoUri, "file:///reel.mp4");
+  });
+
+  it("the system share sheet works even with no YouTube anywhere", async () => {
+    const environment = new FakeShareEnvironment();
+    environment.youtube = false;
+    const controller = new ShareController(environment, "file:///reel.mp4", {
+      mode: "anywhere",
+    });
+    await controller.refresh();
+    const snapshot = await controller.shareAnywhere();
+
+    assert.equal(environment.anywhereCalls, 1);
+    assert.equal(snapshot.status, "Returned");
+  });
+
+  it("a failed sheet shows the exact text", async () => {
+    const environment = new FakeShareEnvironment();
+    environment.anywhereThrows = new Error("no");
+    const controller = new ShareController(environment, "file:///reel.mp4", {
+      mode: "anywhere",
+    });
+    await controller.refresh();
+    const snapshot = await controller.shareAnywhere();
+
+    assert.equal(
+      snapshot.message,
+      "Couldn't share the reel. You can save it and share it manually.",
+    );
+  });
+
+  it("the credit rides in the snapshot for the screen to show", async () => {
+    const environment = new FakeShareEnvironment();
+    const controller = new ShareController(environment, "file:///reel.mp4", {
+      mode: "anywhere",
+      credit: "Music: Night Meter — Test Artist (CC BY)",
+    });
+    assert.equal(controller.snapshot().credit, "Music: Night Meter — Test Artist (CC BY)");
+  });
+
+  it("instagram mode never asks whether YouTube is installed", async () => {
+    const environment = new FakeShareEnvironment();
+    const controller = new ShareController(environment, "file:///reel.mp4");
+    const snapshot = await controller.refresh();
+    assert.equal(snapshot.mode, "instagram");
+    assert.equal(snapshot.youtubeAvailable, false);
+  });
+
+  it("YouTube is refused when the platform said it was not there", async () => {
+    const environment = new FakeShareEnvironment();
+    environment.youtube = false;
+    const controller = new ShareController(environment, "file:///reel.mp4", {
+      mode: "anywhere",
+    });
+    await controller.refresh();
+    await controller.shareToYouTube();
+    assert.equal(environment.youtubeCalls, 0);
   });
 });
 

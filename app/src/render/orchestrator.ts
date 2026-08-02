@@ -41,10 +41,26 @@ export interface RenderSnapshot {
   canRetry: boolean;
 }
 
+/**
+ * The music an export carries, if any.
+ *
+ * `none` is the only value an Instagram-catalogue track ever produces — those exports are
+ * silent for ever, for licensing reasons that are not up for revision. `file` is the user's
+ * own music, already on the device. `remote` is a royalty-free track whose licence permits
+ * embedding; it is fetched to a temporary file first and the copy is deleted after the
+ * export, so nothing builds an offline music library by accident.
+ */
+export type ExportAudio =
+  | { kind: "none" }
+  | { kind: "file"; uri: string; audioStartSec: number }
+  | { kind: "remote"; url: string; audioStartSec: number };
+
 export interface NativeRenderRequest {
   cutList: CutList;
   media: MediaItem[];
   outputPath: string;
+  /** A readable local file by the time it reaches the native module, or null for silent. */
+  audio: { uri: string; startSec: number; durationSec: number } | null;
   onProgress: (fraction: number) => void;
 }
 
@@ -78,6 +94,11 @@ export interface RenderEnvironment {
   saveToGallery(path: string): Promise<string>;
   makeOutputPath(): string;
   keepAwake(on: boolean): void;
+  /** Fetch a remote track to a local file. Rejects on any transport or HTTP failure. */
+  fetchAudio(url: string, toPath: string): Promise<void>;
+  /** Where a fetched track lives while the export runs. */
+  makeAudioPath(): string;
+  fileExists(path: string): Promise<boolean>;
 }
 
 export type RenderListener = (snapshot: RenderSnapshot) => void;
@@ -101,6 +122,8 @@ export class RenderController {
   private cancelRequested = false;
   private currentPath: string | null = null;
   private retriedForMemory = false;
+  /** The transient copy of a fetched royalty-free track, deleted when the run ends. */
+  private fetchedAudioPath: string | null = null;
 
   constructor(environment: RenderEnvironment) {
     this.environment = environment;
@@ -117,11 +140,15 @@ export class RenderController {
   }
 
   /** R-I9 — the cut list handed in here is the object that was previewed. */
-  async start(cutList: CutList, media: MediaItem[]): Promise<RenderSnapshot> {
+  async start(
+    cutList: CutList,
+    media: MediaItem[],
+    audio: ExportAudio = { kind: "none" },
+  ): Promise<RenderSnapshot> {
     if (this.running) return this.running;
     this.cancelRequested = false;
     this.retriedForMemory = false;
-    this.running = this.run(cutList, media);
+    this.running = this.run(cutList, media, audio);
     try {
       return await this.running;
     } finally {
@@ -145,16 +172,34 @@ export class RenderController {
     for (const listener of this.listeners) listener(next);
   }
 
-  private async run(cutList: CutList, media: MediaItem[]): Promise<RenderSnapshot> {
+  private async run(
+    cutList: CutList,
+    media: MediaItem[],
+    audio: ExportAudio,
+  ): Promise<RenderSnapshot> {
     this.environment.keepAwake(true);
     try {
-      return await this.attempt(cutList, media);
+      return await this.attempt(cutList, media, audio);
     } finally {
       this.environment.keepAwake(false);
+      // A fetched royalty-free track never outlives the export it was fetched for. The
+      // licence terms permit a transient working copy, not an offline library.
+      if (this.fetchedAudioPath !== null) {
+        try {
+          await this.environment.deleteFile(this.fetchedAudioPath);
+        } catch {
+          // Already gone.
+        }
+        this.fetchedAudioPath = null;
+      }
     }
   }
 
-  private async attempt(cutList: CutList, media: MediaItem[]): Promise<RenderSnapshot> {
+  private async attempt(
+    cutList: CutList,
+    media: MediaItem[],
+    audio: ExportAudio,
+  ): Promise<RenderSnapshot> {
     this.emit({
       status: "Preparing",
       progress: 0,
@@ -184,7 +229,45 @@ export class RenderController {
 
     if (this.cancelRequested) return this.cancelled();
 
-    // 3. Render.
+    // 3. The music, when the export carries any. A remote royalty-free track is fetched to
+    // a temporary file first — the renderer only ever reads local files. A track that will
+    // not arrive fails the export here, before any rendering, with its own message: a reel
+    // built to carry its music must not quietly come out silent.
+    let nativeAudio: NativeRenderRequest["audio"] = null;
+    if (audio.kind === "file") {
+      nativeAudio = {
+        uri: audio.uri,
+        startSec: audio.audioStartSec,
+        durationSec: cutList.totalDurationSec,
+      };
+    } else if (audio.kind === "remote") {
+      // No link at all — offline before the index arrived, or the link aged out — is the
+      // same failure as a fetch that will not complete, and gets the same honest message.
+      if (audio.url === "") {
+        return this.fail(COPY.render.audioUnavailable, { skippedItemIds: skipped });
+      }
+      const audioPath = this.fetchedAudioPath ?? this.environment.makeAudioPath();
+      const alreadyFetched =
+        this.fetchedAudioPath !== null && (await this.environment.fileExists(audioPath));
+      if (!alreadyFetched) {
+        this.emit({ message: COPY.render.fetchingTrack });
+        try {
+          await this.environment.fetchAudio(audio.url, audioPath);
+          this.fetchedAudioPath = audioPath;
+        } catch {
+          return this.fail(COPY.render.audioUnavailable, { skippedItemIds: skipped });
+        }
+      }
+      nativeAudio = {
+        uri: audioPath,
+        startSec: audio.audioStartSec,
+        durationSec: cutList.totalDurationSec,
+      };
+    }
+
+    if (this.cancelRequested) return this.cancelled();
+
+    // 4. Render.
     const outputPath = this.environment.makeOutputPath();
     this.currentPath = outputPath;
     this.emit({
@@ -199,6 +282,7 @@ export class RenderController {
         cutList,
         media: usable,
         outputPath,
+        audio: nativeAudio,
         onProgress: (fraction) => {
           this.emit({ progress: Math.min(1, Math.max(0, fraction)) });
         },
@@ -212,10 +296,11 @@ export class RenderController {
       }
       if (failure === "outOfMemory" && !this.retriedForMemory) {
         // One retry at reduced concurrency, exactly as the spec allows. Then it is a failure,
-        // not an endless loop on a phone that cannot do it.
+        // not an endless loop on a phone that cannot do it. A fetched track is kept for the
+        // retry — fetching it twice would spend the user's data to learn nothing new.
         this.retriedForMemory = true;
         await this.discard(outputPath);
-        return this.attempt(cutList, usable);
+        return this.attempt(cutList, usable, audio);
       }
 
       await this.discard(outputPath);
@@ -238,12 +323,17 @@ export class RenderController {
       return this.cancelled();
     }
 
-    // 4. Validate. This is the gate that stops a broken reel reaching the gallery.
+    // 5. Validate. This is the gate that stops a broken reel reaching the gallery. What
+    // "valid" means depends on what the export was told to carry: an Instagram-track reel
+    // must have no audio at all, and a reel that carries its music must have exactly that
+    // music-length audio track. Neither mode tolerates the other's file.
     this.emit({ status: "Validating", progress: 1 });
     let validation: ValidationResult;
     try {
       const bytes = await this.environment.readOutput(outputPath);
-      validation = validateExport(bytes, cutList.totalDurationSec);
+      validation = validateExport(bytes, cutList.totalDurationSec, {
+        expectAudio: nativeAudio !== null,
+      });
     } catch (error) {
       await this.discard(outputPath);
       return this.fail(COPY.render.failed, { skippedItemIds: skipped, canRetry: true });
@@ -254,7 +344,7 @@ export class RenderController {
       return this.fail(COPY.render.failed, { skippedItemIds: skipped, canRetry: true });
     }
 
-    // 5. Save.
+    // 6. Save.
     this.emit({ status: "Saving" });
     try {
       const uri = await this.environment.saveToGallery(outputPath);

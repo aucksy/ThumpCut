@@ -133,7 +133,8 @@ interface Section {
 
 ## 3.2 Audio source rule
 
-**All audio comes from Meta's Instagram Audio API `download_url`, and nowhere else.**
+**For Instagram-catalogue tracks, all audio comes from Meta's Instagram Audio API
+`download_url`, and nowhere else.**
 
 The beat grid must be computed from the same recording Instagram will attach to the user's reel.
 Any other source is a different master, a different section, or a different tempo — and the sync
@@ -141,6 +142,10 @@ breaks with no error to catch.
 
 iTunes previews are rejected: they start at an uncontrollable, unexposed offset, and Apple's
 terms forbid synchronising previews with video.
+
+Two other track sources exist since 2026-08-02, each with the same "grid from the exact
+recording" principle: royalty-free tracks are analysed from the same Jamendo stream URL the
+app plays and embeds (spec 09), and local tracks from the very file on the phone (spec 08).
 
 ---
 
@@ -151,17 +156,17 @@ These hold across every phase. Assert them in code where possible.
 | ID | Invariant |
 |---|---|
 | G1 | Output is 1080×1920, exactly 30fps, constant frame rate |
-| G2 | Output contains no audio track at all |
+| G2 | An Instagram-catalogue export contains no audio track at all; a royalty-free or local-track export contains exactly its own music (specs 08–09). Neither validator accepts the other's file |
 | G3 | Output has no edit list and the moov atom is first |
 | G4 | Total media items is between 3 and 30 inclusive |
 | G5 | Video clips never exceed 15 |
 | G6 | Combined source video duration never exceeds 300 seconds |
 | G7 | No slide is shorter than 0.35 seconds |
 | G8 | Every cut boundary is within 50ms of a beat timestamp |
-| G9 | No user photo or video is ever transmitted off the device |
+| G9 | No user photo, video or song is ever transmitted off the device |
 | G10 | The app never crashes on unusable media; it skips the item and names it |
 | G11 | Identical inputs to the cut engine produce identical output |
-| G12 | Beat maps are only ever computed from Meta `download_url` audio |
+| G12 | Beat maps for Instagram-catalogue tracks are only ever computed from Meta `download_url` audio; royalty-free from Jamendo's own stream URL (spec 09); local from the file itself, on the device (spec 08) |
 
 ---
 
@@ -181,17 +186,23 @@ These hold across every phase. Assert them in code where possible.
 | M8 | Per-clip trim in-point | 4 |
 | M9 | 5 templates | 5 |
 | M10 | Track and template recommendation by item count | 5 |
-| M11 | Live preview with metronome click and beat ruler | 5 |
-| M12 | On-device silent MP4 export, 1080×1920 CFR 30 | 6 |
+| M11 | Live preview with the real track streaming, click as fallback | 5 |
+| M12 | On-device MP4 export, 1080×1920 CFR 30 — silent for Instagram tracks, music inside for the rest (G2) | 6 |
 | M13 | Share to Instagram, and save to gallery | 7 |
+| M14 | Your music: local files analysed on the device | 8 |
+| M15 | Royalty-free section (Jamendo, CC BY / BY-SA only) | 9 |
+| M16 | Share to YouTube and the system share sheet, for reels that carry their music | 10 |
 
 ### 5.2 Out of scope — do not build
 
 Scheduled automation of the Factory (a cron entry is enough; no orchestration) · embedded
-audio for Instagram fingerprint matching · streaming real track audio in preview · accounts ·
-analytics · crash reporting · monetisation · text, stickers, captions or filters · aspect
-ratios other than 9:16 · AI-generated music catalogue · reordering after leaving the selection
-screen · manual beat-grid nudging · light mode · tablet layouts · localisation beyond English.
+audio for **Instagram fingerprint matching** (a silent reel quietly carrying the commercial
+recording — still the largest legal exposure; the royalty-free and local modes are a
+different, licensed thing) · accounts · analytics · crash reporting · monetisation · text,
+stickers, captions or filters · aspect ratios other than 9:16 · AI-generated music catalogue
+· reordering after leaving the selection screen · manual beat-grid nudging · light mode ·
+tablet layouts · localisation beyond English · in-app live search of Jamendo · TikTok's
+Share Kit SDK · YouTube Data API uploads.
 
 **Anything in 5.2 must not be built.** If a phase seems to need one, note it in
 `OPEN-QUESTIONS.md` and continue without it.
@@ -313,7 +324,10 @@ Build in this order. Each phase is independently verifiable.
 | 4 | `04-media-selection.md` | The most edge-case-heavy screen. |
 | 5 | `05-preview.md` | Ties the engine to the UI. |
 | 6 | `06-render.md` | The highest technical risk. |
-| 7 | `07-instagram-handoff.md` | Last, because it depends on a finished file. |
+| 7 | `07-instagram-handoff.md` | Last of the original build, because it depends on a finished file. |
+| 8 | `08-local-music.md` | The self-sufficiency path: the phone's own songs, analysed on the device. |
+| 9 | `09-royalty-free.md` | The licensed-to-embed catalogue section, and the with-audio export. |
+| 10 | `10-share-anywhere.md` | YouTube and the system sheet, for reels that carry their music. |
 
 **Do not reorder.** Later phases depend on earlier ones being correct.
 

@@ -102,10 +102,17 @@ Then build without waiting for approval — the owner cannot supervise closely.
 ## What this is
 
 Cross-platform Expo / React Native app. Turns 3–30 photos and video clips (max 15 videos)
-into a beat-synced 1080×1920, 30fps, **silent** MP4, then hands it to Instagram, where the
-user picks the licensed track.
+into a beat-synced 1080×1920, 30fps MP4. Three kinds of track, and the kind decides what
+the export carries and where it can go:
 
-No accounts. No analytics. No backend database. No music hosted or licensed.
+- **Instagram catalogue** — the export is **silent**; Instagram supplies the licensed
+  track after the handoff.
+- **Royalty-free section** (Jamendo, CC BY / BY-SA only) — the export **carries the
+  music**, and shares to YouTube or anywhere.
+- **Your music** (a file on the phone, analysed on the device) — same: music inside,
+  share anywhere.
+
+No accounts. No analytics. No backend database. No music hosted, licensed or re-served.
 Must run on a mid-range Android phone with 2GB RAM.
 
 ## Stack — do not deviate without asking
@@ -131,35 +138,55 @@ Must run on a mid-range Android phone with 2GB RAM.
 
 ## Global invariants — must always hold
 
-- Output is **always** 1080×1920, exactly 30fps, constant frame rate, silent, no edit lists, moov atom first.
+- Output is **always** 1080×1920, exactly 30fps, constant frame rate, no edit lists, moov atom first.
 - Media items: 3–30 total. Video clips: 15 maximum. Combined source video: 300s maximum.
 - No slide is ever shorter than **0.35s**.
 - Every cut lands within **50ms** of a beat timestamp.
 - The app never crashes on bad media. It skips the item and tells the user which one.
-- No user photo or video ever leaves the device.
-- The exported file contains **no audio track at all**.
+- No user photo, video **or song** ever leaves the device.
+- An **Instagram-catalogue** export contains **no audio track at all**. A **royalty-free or
+  local-track** export contains **exactly its own music** and nothing else. Neither mode's
+  validator accepts the other's file.
 
-## Audio source — non-negotiable
+## Audio source rules
 
-All beat maps are computed from audio fetched via **Meta's Instagram Audio API `download_url`**.
-Never iTunes, never Spotify, never any other source.
+Beat maps for **Instagram-catalogue tracks** are computed only from audio fetched via
+**Meta's Instagram Audio API `download_url`** — never iTunes, never Spotify, never any
+other copy, or the sync breaks silently against the recording Instagram attaches.
 
-## Two different questions about audio. Never confuse them.
+Two more sources exist since 2026-08-02, each with its own rule:
 
-Two sessions in a row read one of these as the other, and shipped the wrong thing twice.
+- **Royalty-free (Jamendo)** — only tracks whose own licence URL says CC BY or CC BY-SA.
+  The gate lives in Factory code; the API's licence flags are hints, never trusted. Nothing
+  of Jamendo's is cached into a library: stream the preview, fetch a transient copy at
+  export, delete it after. Free tier is for a no-revenue app — the day ThumpCut monetises,
+  licensing@jamendo.com first.
+- **Your music** — analysed **on the device** by `@thumpcut/beat-engine` (the Factory's
+  algorithm, held to its published answers by a parity test). The file never leaves the
+  phone and never enters the published catalogue.
 
-**1. The exported MP4 is silent, for ever.** No audio track at all. Putting a commercial
-recording inside a file we hand the user is unlicensed synchronisation, and it is the largest
-legal exposure this product could take. Instagram applies the licensed track after the
-handoff. **Not up for revision.**
+## Three different questions about audio. Never confuse them.
 
-**2. The preview inside the app plays the real track.** Owner decision, 2026-08-02, and it
-overrides spec 05 §1.1's old "BUILD MODE A, DO NOT ASK". The benchmark is the Play Store app
-*Beats — Reel Maker for Instagram Beat*, which plays the actual music while previewing. The
-app streams a plain HTTPS link published in `catalogue/audio.json`; it holds no Instagram
-token and calls no Meta API. The metronome click is the **fallback** when the recording cannot
-be fetched — offline, expired link, withdrawn track — and it says so on screen when it happens.
+Two sessions in a row read one of these as another, and shipped the wrong thing twice.
+
+**1. An Instagram-catalogue export is silent, for ever.** No audio track at all. Putting a
+commercial recording inside a file we hand the user is unlicensed synchronisation, and it is
+the largest legal exposure this product could take. Instagram applies the licensed track
+after the handoff. **Not up for revision.**
+
+**2. The preview inside the app plays the real track — for every source.** Owner decision,
+2026-08-02. Instagram tracks stream the link published in `catalogue/audio.json`; local
+tracks play the file itself. The metronome click is the **fallback** when the recording
+cannot be fetched — offline, expired link, withdrawn track — and it says so on screen.
 Never the default.
+
+**3. Royalty-free and local-track exports carry their music inside the file.** Owner
+decision, 2026-08-02, and the point of those features: *"the final export can actually have
+the music built into it, which Instagram, YouTube and TikTok will not ban."* This is legally
+a different thing from question 1 — the licence (CC BY / BY-SA) or ownership of the file is
+what permits it. These reels share to YouTube and the system sheet; silent Instagram-track
+reels are **never** offered there, because YouTube would invite picking a different song and
+every cut would miss.
 
 ## Design rules — non-negotiable
 

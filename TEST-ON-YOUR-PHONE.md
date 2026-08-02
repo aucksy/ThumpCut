@@ -53,18 +53,22 @@ me a screenshot of the red one.
 
 **Read this before you start, or two of the tests below will look broken when they aren't.**
 
-- **NEW: the preview plays the song.** Until this build it played a click on each beat. Now you
-  should hear the actual music while you watch the pictures cut to it. If the music cannot be
-  fetched — no signal, say — you get the click instead and the screen tells you so in words.
-  This is the main thing to check in this build.
-- **NEW: the preview shows your pictures.** The panel above the beat ruler used to be an empty
-  grey rectangle. It now shows whichever of your photos belongs at that moment.
-- **The songs are fake.** Three test tracks by "ThumpCut Test Kit" at three different speeds.
-  They are real audio with real beats, so every timing test below is genuine — but they are
-  not Instagram's music. Real songs need one thing from you (see the end of this page).
-- **The Instagram button will not appear.** Not a bug, and not the app failing to find
-  Instagram: sharing to Instagram needs an ID from Meta that we do not have yet. Rather than
-  show you a button that fails, the app hides it. **Save to gallery works.**
+- **NEW: your own music works, start to finish.** On the screen where styles are suggested
+  there is now a row of song choices, and the first chip is **Your music**. Tap it, pick any
+  song saved on your phone, wait a few seconds while it says **Reading the beat** with a
+  percentage — and from there everything works as normal, except the finished video **has the
+  music inside it** and the last screen offers **Share to YouTube** and **Share anywhere**.
+  This is the app's independent path: it needs no Meta anything.
+- **NEW: the preview plays the song.** You hear the actual music while you watch the pictures
+  cut to it. If the music cannot be fetched — no signal, say — you get the click instead and
+  the screen tells you so in words.
+- **NEW: the preview shows your pictures.** The panel above the beat ruler shows whichever of
+  your photos belongs at that moment.
+- **The built-in songs are fake.** Three test tracks by "ThumpCut Test Kit". Real Instagram
+  songs and a royalty-free section each need one small thing from you (see the end).
+- **The Instagram button will not appear.** Not a bug: sharing to Instagram needs an ID from
+  Meta that is not set yet. Rather than show you a button that fails, the app hides it.
+  **Save to gallery works, and so does the whole Your-music path above.**
 - **Photos do not drift or zoom yet.** They hold still. The gentle zoom is designed but not
   built into the video yet.
 - **Template cards do not move.** They show a still panel. That is the designed fallback, not
@@ -183,14 +187,45 @@ is no broken file in your gallery.
 **Turn "Don't keep activities" back off when you are finished.** Leaving it on makes every app
 on the phone behave badly.
 
+### The new path — your own music, and sharing it anywhere
+
+**21. Your music appears and analyses.**
+On the style-suggestions screen, tap the **Your music** chip. Allow music access when asked.
+Pick any song. You should see **Reading the beat** with a percentage that climbs, for roughly
+five to twenty seconds depending on the song — then you are back with that song selected.
+*Wrong if:* it sits at 0%, the app closes, or a song you know has a clear beat is refused.
+
+**22. Picking the same song again is instant.**
+Go back into Your music and tap the same song. No reading step — it should select immediately.
+The app remembers every song it has already read.
+
+**23. The preview plays your song, and the export contains it.**
+Carry on to the preview — your song should play, pictures cutting to it. Export, then play the
+reel in your normal gallery app **with the volume up**.
+*Right if:* the reel has the music in it, starting from the same part of the song the preview
+played, and the cuts land on its beat.
+*Wrong if:* the reel is silent, the music starts from a different place, or it drifts.
+
+**24. Share to YouTube.**
+On the last screen after exporting with your song, you should see **Share to YouTube** (if
+YouTube is installed) and **Share anywhere** — and no Instagram button. Tap the YouTube one.
+*Right if:* YouTube opens with your reel ready to post as a Short — the music already in it.
+*Wrong if:* the button is missing with YouTube installed, or YouTube opens empty. This exact
+handoff is the one step no Google document guarantees, so it is the most valuable test on
+this page.
+
+**25. Share anywhere.**
+Same screen, tap **Share anywhere** and pick WhatsApp (or anything). Send it to yourself.
+*Right if:* the received video plays with the music in it.
+
 ### Not yet — here so they are not forgotten
 
-**14–18. Everything to do with Instagram.** The button is deliberately hidden until I have the
-Meta app ID from you (see below). Once I have it these become: the button appears, sharing
-opens Instagram with the reel loaded, cancelling inside Instagram and coming back keeps
-everything, uninstalling Instagram makes the button vanish, and the cuts still land on the beat
-once a real track is applied. That last one is the one that proves the whole product works, and
-it also needs real songs rather than the three test tracks.
+**14–18. Everything to do with Instagram's own music.** The button is deliberately hidden
+until the Meta app ID exists (see below). Once it does, these become: the button appears,
+sharing opens Instagram with the reel loaded, cancelling inside Instagram and coming back
+keeps everything, uninstalling Instagram makes the button vanish, and the cuts still land on
+the beat once a real track is applied inside Instagram. That last one also needs real songs
+rather than the three test tracks.
 
 **19–20. The iPhone ones.** There is no iPhone build yet — this is Android only. Limited photo
 access, and an iCloud photo that has not downloaded.
@@ -199,33 +234,12 @@ access, and an iCloud photo that has not downloaded.
 
 ## Part 4 — What I need from you to finish this
 
-Three things, and only the first is urgent.
+Everything is written up properly, step by step, in **GO-LIVE.md** — that file is the single
+place for every key and where it goes. The short version: a **Meta app ID** turns on the
+Instagram button, a **Meta access token** turns on real trending songs, and a free **Jamendo
+key** turns on a royalty-free section whose reels carry their music. The app already works
+end to end today with none of them, through Your music.
 
-### 1. A Meta app ID — the one that matters
-
-Without it the Instagram button cannot exist, and sharing to Reels is the whole point of the
-product. It is free, there is no review and no approval.
-
-- Go to **https://developers.facebook.com/apps** and sign in.
-- **Create app** → give it any name → choose **Other** → **Business** → create.
-- On the dashboard, copy the **App ID**. It is a long number.
-
-Then put it into the build — you do not need to send it to me, and it is better if you don't:
-
-- Go to **https://github.com/aucksy/ThumpCut/settings/secrets/actions**
-- **New repository secret**
-- Name: `META_APP_ID` (exactly that, capitals and underscore)
-- Secret: paste the number → **Add secret**
-
-The next build picks it up on its own. Nothing else changes.
-
-### 2. Real songs, instead of the three test tracks
-
-Same idea: a **Meta access token**, added as a secret named `META_ACCESS_TOKEN`. Once it is
-there, the song list rebuilds itself from Instagram's real music library and the app starts
-offering real tracks. Until then the test kit stands in and every timing test still counts.
-
-### 3. Template preview videos
-
-Five short looping clips, one per style — or just tell me to ship the still panels. Purely
-cosmetic; the app works either way. This one can wait indefinitely.
+One purely cosmetic item lives outside GO-LIVE.md: five short looping template preview
+videos, one per style — or just say "ship the still panels". The app works either way, and
+this one can wait indefinitely.

@@ -33,6 +33,7 @@ from factory.discover import (
     discover,
     discover_local,
 )
+from factory.royaltyfree import JamendoFailed, discover_royaltyfree
 from factory.engines import DEFAULT_ENGINE_NAME, get_engine
 from factory.engines.base import BeatEngineUnavailable
 from factory.fetch import FetchFailed, assert_temp_dir_empty, fetch_audio, purge_temp_dir
@@ -73,6 +74,8 @@ class RunReport:
     failures: list[tuple[str, str]] = field(default_factory=list)
     # How many published tracks the app's preview can actually stream.
     playable: int = 0
+    # How many published tracks are royalty-free — the section that exports with its music.
+    royaltyfree: int = 0
     aborted: bool = False
     abort_reason: str = ""
 
@@ -174,6 +177,14 @@ def refresh_links(
         _log(f"DISCOVERY_FAIL: {exc}. Keeping the previous audio links.")
         return report
 
+    # The royalty-free links do not expire, but the index is rebuilt whole — so its tracks
+    # must be in the answer or a timed refresh would silently drop their entries.
+    try:
+        discovered = discovered + discover_royaltyfree(creds)
+    except JamendoFailed as exc:
+        _log(f"DISCOVERY_FAIL: {exc}. Keeping the previous audio links.")
+        return report
+
     previous = load_previous_beat_maps(destination)
     if not previous:
         _log("NO_CATALOGUE: nothing published yet. Run the Factory properly first.")
@@ -184,6 +195,7 @@ def refresh_links(
         for track in discovered
         if track.download_url and track.audio_id in previous
     }
+    stable_ids = {track.audio_id for track in discovered if track.stable_link}
     beat_maps = [previous[track_id] for track_id in sorted(audio_sources)]
 
     if not beat_maps:
@@ -191,7 +203,9 @@ def refresh_links(
         return report
 
     try:
-        _, index = write_audio_index_only(beat_maps, audio_sources, destination)
+        _, index = write_audio_index_only(
+            beat_maps, audio_sources, destination, stable_ids=stable_ids
+        )
     except PublishFailed as exc:
         _log(f"PUBLISH_FAIL {exc}")
         report.aborted = True
@@ -252,6 +266,23 @@ def run_factory(
         _log(f"DISCOVERY_FAIL: {exc}. Keeping the previous catalogue.")
         report.aborted = False
         return report
+
+    # The royalty-free section rides alongside whatever the main source produced — real
+    # trending tracks or the test kit. Local mode is the exception: the owner dropped his own
+    # files in to hear cuts against them, and mixing a catalogue into that session would
+    # bury the very tracks he came to hear.
+    if not local_tracks:
+        try:
+            royalty_free = discover_royaltyfree(creds)
+        except JamendoFailed as exc:
+            # A partial answer must never read as tracks having been retired: one source
+            # failing keeps the whole previous catalogue, exactly like Meta discovery.
+            _log(f"DISCOVERY_FAIL: {exc}. Keeping the previous catalogue.")
+            report.aborted = False
+            return report
+        if royalty_free:
+            _log(f"ROYALTY_FREE {len(royalty_free)} tracks from Jamendo passed the licence gate.")
+            discovered = discovered + royalty_free
 
     if not discovered:
         _log("WARNING: the trending list came back empty. Keeping the previous catalogue.")
@@ -340,11 +371,27 @@ def run_factory(
     audio_sources = {
         track.audio_id: track.download_url for track in discovered if track.download_url
     }
+    stable_ids = {track.audio_id for track in discovered if track.stable_link}
+    track_info = {
+        track.audio_id: {
+            "source": track.source,
+            "licence_name": track.licence_name,
+            "licence_url": track.licence_url,
+        }
+        for track in discovered
+        if track.source != "instagram"
+    }
 
     try:
         templates = load_templates()
         _, catalogue = write_local(
-            ready, templates, destination, moment, audio_sources=audio_sources
+            ready,
+            templates,
+            destination,
+            moment,
+            audio_sources=audio_sources,
+            track_info=track_info,
+            stable_ids=stable_ids,
         )
     except DiskFull as exc:
         _log(str(exc))
@@ -358,6 +405,9 @@ def run_factory(
         return report
 
     report.published = [track["trackId"] for track in catalogue["tracks"]]
+    report.royaltyfree = sum(
+        1 for track in catalogue["tracks"] if track.get("source") == "royaltyfree"
+    )
 
     # Said out loud because the alternative is a preview that clicks and nobody knowing why.
     report.playable = _count_playable_links(destination)
@@ -365,6 +415,11 @@ def run_factory(
         f"AUDIO_LINKS {report.playable} of {len(report.published)} tracks can be streamed in "
         f"the preview. The rest fall back to the click."
     )
+    if report.royaltyfree:
+        _log(
+            f"ROYALTY_FREE {report.royaltyfree} of {len(report.published)} published tracks "
+            f"export with their music inside the file."
+        )
 
     if creds.has_r2 and not skip_upload:
         try:

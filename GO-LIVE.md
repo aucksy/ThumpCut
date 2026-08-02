@@ -1,155 +1,138 @@
-# Getting to a full end-to-end test
+# Every key the app can use, what each one unlocks, and exactly where it goes
 
-Everything you need to do, in order. About **25 minutes** of your time in total, split into two
-parts that are worth doing on different days if you like — Part 1 is useful on its own.
+This is the only page you need. Three keys exist. **None of them is required for the app to
+work** — Part 0 explains why — and each one can be added on its own, in any order, whenever
+you are ready. Adding a key is always the same three steps: get the value, paste it into a
+named box on GitHub, press one Run button.
 
-Nothing here needs a laptop with developer tools. Part 1 is entirely in a browser. Part 2 is a
-browser plus two minutes on your phone.
+**Where every key goes (all three use this):**
 
----
-
-## First — one thing that will never happen, so you are not waiting for it
-
-**The video ThumpCut makes has no sound in it, on purpose, and always will.**
-
-That is not a missing feature. Putting a commercial recording inside a video file we hand you is
-unlicensed synchronisation, and it is the single largest legal risk this product could take. The
-whole design avoids it: ThumpCut cuts the pictures to the beat, hands the silent video to
-Instagram, and **Instagram** puts the licensed track on it. That last step is where the music
-appears, and it is where you will hear whether we got the timing right.
-
-**The preview inside the app is a different thing, and it does play the song.** That changed on
-2 August. Open a track, pick a style, and you hear the actual music with the pictures cutting on
-its beats. If the music cannot be fetched — you are offline, or the link has aged out — you get
-a click on each beat instead and the screen tells you so. The click is the safety net now, not
-the normal state.
-
-So you can hear the sync in three places:
-
-- **In the app's preview.** The quickest check, and the one to do first.
-- **Inside Instagram**, after you tap Share and pick the track. This is the real test, because
-  it is Instagram's own copy of the recording.
-- **On your laptop**, in the demo page — which after Part 2 can be rebuilt against a real
-  trending track.
-
----
-
-## Part 1 — Turn on the Instagram Share button
-
-**Time:** about 10 minutes. **Gets you:** the Share button appears, and you can post a reel to
-Instagram end to end using the test tracks. This is most of the product.
-
-### 1. Make a Meta app
-
-1. Go to **<https://developers.facebook.com/apps>** and log in with your Facebook account.
-   If it asks you to register as a developer, agree — it is free and instant.
-2. Click **Create app**.
-3. Where it asks what you want your app to do, choose **Other**, then **Next**.
-4. For the type, choose **Business**, then **Next**.
-5. Name it `ThumpCut`, check your email address is right, click **Create app**.
-   It may ask for your password.
-
-### 2. Copy the App ID
-
-On the app's dashboard, the **App ID** is near the top — a long number, something like
-`1234567890123456`. Copy it.
-
-### 3. Give it to the build
-
-1. Go to **<https://github.com/aucksy/ThumpCut/settings/secrets/actions>**
+1. Open **<https://github.com/aucksy/ThumpCut/settings/secrets/actions>**
 2. Click **New repository secret**
-3. Name: `META_APP_ID` — exactly that, capitals and underscore
-4. Secret: paste the number
-5. **Add secret**
-
-### 4. Rebuild
-
-1. Go to **<https://github.com/aucksy/ThumpCut/actions/workflows/android.yml>**
-2. Click **Run workflow** on the right, then the green **Run workflow** button
-3. Wait about ten minutes for the green tick
-4. Install the new build from
-   **<https://github.com/aucksy/ThumpCut/releases/latest>** as usual
-
-**You should now see a "Share to Instagram" button** on the last screen. If it is still missing,
-the App ID did not reach the build — tell me and I will check.
+3. Type the NAME exactly as written below (capitals and underscores matter)
+4. Paste the value into the Secret box → **Add secret**
 
 ---
 
-## Part 2 — Real trending music
+## Part 0 — What already works with no keys at all
 
-**Time:** about 15 minutes. **Gets you:** the actual songs trending on Instagram, in the app,
-with their real beats.
+**The app is complete and self-sufficient today.** Install it from
+<https://github.com/aucksy/ThumpCut/releases/latest> and you can:
 
-### 1. Make your Instagram account Professional
+1. Open it and pick a style.
+2. On the style screen, tap the **Your music** chip and pick **any song saved on your
+   phone** — a royalty-free download, for example.
+3. The app reads the song's beat on the phone itself ("Reading the beat · 47%", a few
+   seconds, once ever per song).
+4. Preview with the music playing, pictures cutting on its beats.
+5. Export — **the music is inside the finished video.**
+6. **Share to YouTube** (it becomes a YouTube Short by itself), **Share anywhere**
+   (WhatsApp, TikTok, anything), or save to your gallery.
 
-Two minutes on your phone. A personal account cannot see the music list; a Professional one can,
-and it is free, reversible, and changes nothing anyone else sees.
+This is the "if I can never finish the Meta setup" answer: it already works, end to end,
+for ever, with nothing from anyone.
 
-1. Instagram → your profile → the ☰ menu → **Settings and privacy**
-2. **Account type and tools** → **Switch to professional account**
-3. Pick any category → choose **Creator** → continue
-4. **When it offers to connect a Facebook Page, say yes.** Let it create one for you if you do
-   not have one. **This step is the one people skip, and nothing works without it.**
-
-### 2. Get a token
-
-1. On the laptop, go to **<https://developers.facebook.com/tools/explorer>**
-2. Top right, in the **Meta App** dropdown, choose **ThumpCut**
-3. Below that, in **Permissions**, add these three — type each into the box and pick it:
-   - `instagram_basic`
-   - `instagram_content_publish`
-   - `pages_show_list`
-4. Click the blue **Generate Access Token** button
-5. Log in and click through the permission screens, saying yes to your Page and Instagram account
-6. Copy the **Access Token** — a very long string
-
-### 3. Give it to the build
-
-1. Go to **<https://github.com/aucksy/ThumpCut/settings/secrets/actions>**
-2. **New repository secret**
-3. Name: `META_ACCESS_TOKEN`
-4. Secret: paste the long string
-5. **Add secret**
-
-You do **not** need to find an Instagram account ID. The build works it out from the token.
-
-### 4. Build the real song list
-
-1. Go to **<https://github.com/aucksy/ThumpCut/actions/workflows/catalogue.yml>**
-2. **Run workflow** → the green **Run workflow** button
-3. About two minutes.
-   - **Green tick:** it worked. Real tracks are in.
-   - **Red cross:** click into it and read the last step. It is written in plain English and says
-     exactly which of the above went wrong — almost always the Facebook Page in step 1.4.
-4. Then rebuild the app: **<https://github.com/aucksy/ThumpCut/actions/workflows/android.yml>**
-   → **Run workflow**, wait ten minutes, and install the new build.
+The three built-in songs are still the test kit ("ThumpCut Test Kit") until Part 2 or
+Part 3 replaces or extends them.
 
 ---
 
-## About that token expiring
+## Part 1 — `META_APP_ID` — turns on the "Share to Instagram" button
 
-The token from step 2.2 lasts about **an hour**. That is fine — it only has to survive the two
-minutes the song list takes to build, and the result is saved permanently.
+**Time:** about 10 minutes. **Cost:** free, no review, no approval.
+This is for reels made with **Instagram's own songs**: the app exports them silent, hands
+them to Instagram, and Instagram adds the licensed track.
 
-When you want to refresh the songs later, the workflow will fail with "the token has expired".
-Generate a new one the same way and replace the secret. **The app keeps working from the last
-good song list in the meantime** — nothing breaks while the token is stale.
+1. Go to **<https://developers.facebook.com/apps>**, log in with your Facebook account.
+   If it asks you to register as a developer, agree — free and instant.
+2. **Create app** → what do you want to do: **Other** → type: **Business** → name it
+   `ThumpCut` → **Create app**.
+3. On the dashboard, copy the **App ID** — a long number near the top.
+4. Add it as a secret (the four steps at the top). NAME: `META_APP_ID`
+5. Rebuild: **<https://github.com/aucksy/ThumpCut/actions/workflows/android.yml>** →
+   **Run workflow** → wait for the green tick (~15 min) → install the new build from
+   the releases page as usual.
 
-If this becomes annoying we can swap it for a long-lived token that lasts two months. Say the
-word.
+**You should now see "Share to Instagram"** on the last screen after exporting with a
+built-in song. If it is still missing, the ID did not reach the build — say so.
+
+**One thing for later, before strangers use the app:** in the Meta dashboard there is an
+**App Mode** switch (Development / Live). Your own phone works in Development. Before the
+app goes public, flip it to **Live**, or sharing will only work for you. Nothing to decide
+today — it is a one-tap switch whenever release day comes.
 
 ---
 
-## What you will be able to test once both parts are done
+## Part 2 — `META_ACCESS_TOKEN` — turns on Instagram's real trending songs
 
-1. Open the app, see **real trending songs**, pick one.
-2. Pick a style, pick your photos and clips.
-3. Watch the preview — **the song plays**, the beat ruler moves, the pictures cut on the beats.
-4. Export. The reel saves to your gallery, silent.
-5. Tap **Share to Instagram**. Instagram opens with your reel already loaded.
-6. **Pick the same track in Instagram.** This is the moment of truth: the song plays and the
-   pictures should change exactly on the beat.
-7. Post it, or discard it — either way, step 6 is the answer to whether this product works.
+**Time:** about 15 minutes. **Needs:** Part 1 done first, plus two minutes on your phone.
 
-If step 6 is off — cuts landing slightly early or late — tell me by how much and in which
-direction, and that is a solvable, measurable problem.
+**First, on the phone (once):** Instagram → your profile → ☰ → **Settings and privacy** →
+**Account type and tools** → **Switch to professional account** → pick any category →
+**Creator**. **When it offers to connect a Facebook Page, say yes** — let it create one.
+That connection is the step people skip, and nothing works without it.
+
+**Then, on the laptop:**
+
+1. Go to **<https://developers.facebook.com/tools/explorer>**
+2. Top right, **Meta App** dropdown → choose **ThumpCut**
+3. Under **Permissions**, add all three: `instagram_basic`,
+   `instagram_content_publish`, `pages_show_list`
+4. Click **Generate Access Token**, click through the approvals, say yes to your Page
+   and Instagram account
+5. Copy the long token
+6. Add it as a secret. NAME: `META_ACCESS_TOKEN`
+7. Build the song list: **<https://github.com/aucksy/ThumpCut/actions/workflows/catalogue.yml>**
+   → **Run workflow** (~2 min). Green tick: real songs are in. Red cross: open it and read
+   the last step — it says in plain words which step above went wrong, almost always the
+   Facebook Page connection.
+8. Rebuild the app (same as Part 1 step 5) and install it.
+
+**About this token expiring:** it lives about an hour, which is fine — it only needs to
+survive the two minutes the song list takes to build, and the result is saved. When you
+want fresh songs weeks later, generate a new token the same way, replace the secret, run
+the catalogue workflow again. **The app keeps working from the last good song list the
+whole time.** If this ever gets annoying, say the word and it can be swapped for a
+two-month token.
+
+---
+
+## Part 3 — `JAMENDO_CLIENT_ID` — turns on the royalty-free section
+
+**Time:** about 10 minutes. **Cost:** free. **Needs:** nothing else — works without Parts 1–2.
+
+This adds a **Royalty-free** section to the song row in the app: real music, legally clear
+to embed, so those reels carry their music inside the file and share anywhere — same as
+Your music, but the songs come with the app. Only tracks whose licence allows reuse and
+editing are let in; the app shows the credit line to copy into a caption.
+
+1. Go to **<https://devportal.jamendo.com>** and sign up (free).
+2. Create an application — name it `ThumpCut`, any description.
+3. Copy its **client id**.
+4. Add it as a secret. NAME: `JAMENDO_CLIENT_ID`
+5. Run the catalogue workflow (Part 2 step 7's link) → green tick.
+6. Rebuild the app (Part 1 step 5) and install it.
+
+**You should now see a ROYALTY-FREE group** in the song row, each song with its licence
+(like "CC BY") on the chip.
+
+**Two standing rules that came with this provider — they are the deal, not settings:**
+
+- **If ThumpCut ever makes money — ads included — Jamendo's free tier no longer covers
+  it.** Write to licensing@jamendo.com first. Today the app is free with no ads, so all is
+  well.
+- The app must never offer "download for offline listening" of these songs. It doesn't,
+  and it shouldn't ever.
+
+---
+
+## After all three parts — the full test
+
+1. Open the app: real trending songs, a royalty-free group, and Your music, all in one row.
+2. An Instagram-song reel: exports silent → **Share to Instagram** → pick the same song
+   inside Instagram → **the cuts land on the beat.** That is the whole product proved.
+3. A royalty-free or Your-music reel: exports **with the music inside** → Share to
+   YouTube / anywhere → plays with sound wherever it lands.
+
+If a cut lands slightly early or late anywhere in step 2 or 3, tell me by how much and in
+which direction — that is a solvable, measurable problem.

@@ -11,7 +11,13 @@ import { requireOptionalNativeModule } from "expo";
 export interface InstagramShareNativeModule {
   isAvailable(): Promise<boolean>;
   shareToReels(videoPath: string, metaAppId: string): Promise<void>;
+  isPackageAvailable(packageName: string): Promise<boolean>;
+  shareToPackage(videoPath: string, packageName: string): Promise<void>;
+  shareSystem(videoPath: string): Promise<void>;
 }
+
+/** YouTube's Android package. A vertical video under three minutes becomes a Short there. */
+export const YOUTUBE_PACKAGE = "com.google.android.youtube";
 
 const native = requireOptionalNativeModule<InstagramShareNativeModule>("InstagramShare");
 
@@ -51,6 +57,44 @@ export async function shareToReels(videoPath: string, metaAppId: string): Promis
   } catch (error) {
     throw new InstagramHandoffError(
       error instanceof Error ? error.message : "Instagram would not accept the reel.",
+    );
+  }
+}
+
+/** True only when the named app is installed and can take a video. False without the module. */
+export async function isPackageAvailable(packageName: string): Promise<boolean> {
+  if (!native) return false;
+  try {
+    return await native.isPackageAvailable(packageName);
+  } catch {
+    return false;
+  }
+}
+
+/** Hand the reel to one named app — YouTube's upload flow, in practice. */
+export async function shareToPackage(videoPath: string, packageName: string): Promise<void> {
+  if (!native) {
+    throw new InstagramHandoffError("The share module is not available in this build.");
+  }
+  try {
+    await native.shareToPackage(videoPath, packageName);
+  } catch (error) {
+    throw new InstagramHandoffError(
+      error instanceof Error ? error.message : "That app would not accept the reel.",
+    );
+  }
+}
+
+/** The system share sheet — every app the phone has, the user picks. */
+export async function shareSystem(videoPath: string): Promise<void> {
+  if (!native) {
+    throw new InstagramHandoffError("The share module is not available in this build.");
+  }
+  try {
+    await native.shareSystem(videoPath);
+  } catch (error) {
+    throw new InstagramHandoffError(
+      error instanceof Error ? error.message : "Nothing could accept the reel.",
     );
   }
 }

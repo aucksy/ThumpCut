@@ -94,8 +94,9 @@ class ReelRenderModule : Module() {
 
     Events("onProgress")
 
-    AsyncFunction("render") Coroutine { cuts: List<Map<String, Any?>>, outputPath: String ->
-      runRender(cuts, outputPath)
+    AsyncFunction("render") Coroutine {
+      cuts: List<Map<String, Any?>>, outputPath: String, audio: Map<String, Any?>? ->
+      runRender(cuts, outputPath, audio)
     }
 
     AsyncFunction("cancel") {
@@ -163,7 +164,11 @@ class ReelRenderModule : Module() {
   // The render itself
   // -------------------------------------------------------------------------
 
-  private suspend fun runRender(cuts: List<Map<String, Any?>>, outputPath: String): Double =
+  private suspend fun runRender(
+    cuts: List<Map<String, Any?>>,
+    outputPath: String,
+    audio: Map<String, Any?>?,
+  ): Double =
     suspendCoroutine { continuation ->
       val context = appContext.reactContext
       if (context == null) {
@@ -183,7 +188,7 @@ class ReelRenderModule : Module() {
         val holder = Pending(continuation)
         pending = holder
         try {
-          begin(context, cuts, outputPath, holder)
+          begin(context, cuts, outputPath, audio, holder)
         } catch (error: Throwable) {
           settle(holder) { it.resumeWithException(asCoded(error)) }
         }
@@ -194,6 +199,7 @@ class ReelRenderModule : Module() {
     context: Context,
     cuts: List<Map<String, Any?>>,
     outputPath: String,
+    audio: Map<String, Any?>?,
     holder: Pending,
   ) {
     val output = File(outputPath.removePrefix("file://"))
@@ -207,7 +213,16 @@ class ReelRenderModule : Module() {
     val sequence = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO))
       .addItems(items)
       .build()
-    val composition = Composition.Builder(sequence).build()
+
+    // The music, when the export is allowed to carry any. Tracks from Instagram's catalogue
+    // are never handed in here — their exports stay silent for ever, for licensing reasons
+    // that are not up for revision. This path exists for the user's own music and for
+    // royalty-free tracks whose licence permits it.
+    val sequences = mutableListOf(sequence)
+    if (audio != null) {
+      sequences.add(toAudioSequence(audio))
+    }
+    val composition = Composition.Builder(sequences).build()
 
     val built = Transformer.Builder(context)
       .setVideoMimeType(MimeTypes.VIDEO_H264)
@@ -293,6 +308,41 @@ class ReelRenderModule : Module() {
     }
 
     return builder.build()
+  }
+
+  /**
+   * The music as a second sequence: one item, clipped to exactly the stretch of the track
+   * the reel was cut against, so the sound in the file is the sound the preview played.
+   *
+   * `setRemoveVideo` is not decoration: an mp3's cover art arrives as a video track, and
+   * without this it would race the real timeline for the file's single video slot.
+   */
+  private fun toAudioSequence(audio: Map<String, Any?>): EditedMediaItemSequence {
+    val uri = audio["uri"] as? String
+      ?: throw CodedException("unknown", "The audio has no source.", null)
+    val startMs = ((audio["startSec"] as? Double ?: 0.0) * 1000).toLong()
+    val durationMs = ((audio["durationSec"] as? Double ?: 0.0) * 1000).toLong()
+    if (durationMs <= 0) {
+      throw CodedException("unknown", "The audio has no duration.", null)
+    }
+
+    val item = MediaItem.Builder()
+      .setUri(Uri.parse(uri))
+      .setClippingConfiguration(
+        MediaItem.ClippingConfiguration.Builder()
+          .setStartPositionMs(startMs)
+          .setEndPositionMs(startMs + durationMs)
+          .build()
+      )
+      .build()
+
+    val edited = EditedMediaItem.Builder(item)
+      .setRemoveVideo(true)
+      .build()
+
+    return EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
+      .addItems(listOf(edited))
+      .build()
   }
 
   /** Transformer has no progress callback, so the progress bar has to ask. */

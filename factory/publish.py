@@ -64,9 +64,14 @@ class CatalogueTrack:
     durationSec: float
     contentHash: str
     beatMapPath: str
+    # "instagram" or "royaltyfree". The app reads an absent field as "instagram", which is
+    # what every pre-field catalogue was, so the field is always written for clarity.
+    source: str = "instagram"
+    licence_name: str = ""
+    licence_url: str = ""
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "trackId": self.trackId,
             "title": self.title,
             "artist": self.artist,
@@ -74,7 +79,11 @@ class CatalogueTrack:
             "durationSec": self.durationSec,
             "contentHash": self.contentHash,
             "beatMapPath": self.beatMapPath,
+            "source": self.source,
         }
+        if self.licence_name and self.licence_url:
+            payload["licence"] = {"name": self.licence_name, "url": self.licence_url}
+        return payload
 
 
 def load_templates(path: Path | None = None) -> list[dict[str, Any]]:
@@ -91,8 +100,17 @@ def build_catalogue(
     beat_maps: list[BeatMap],
     templates: list[dict[str, Any]],
     now: datetime | None = None,
+    track_info: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Assemble catalogue.json from the beat maps that survived this run."""
+    """
+    Assemble catalogue.json from the beat maps that survived this run.
+
+    ``track_info`` carries what a beat map deliberately does not: where the track came from
+    and under what licence — per track id, with ``source``, ``licence_name``,
+    ``licence_url``. Anything absent is an Instagram-catalogue track, which is what every
+    track was before the royalty-free section existed.
+    """
+    info = track_info or {}
     tracks = [
         CatalogueTrack(
             trackId=beat_map.trackId,
@@ -102,6 +120,9 @@ def build_catalogue(
             durationSec=beat_map.durationSec,
             contentHash=beat_map.contentHash,
             beatMapPath=f"{BEATMAP_DIRNAME}/{beat_map.trackId}.json",
+            source=info.get(beat_map.trackId, {}).get("source", "instagram"),
+            licence_name=info.get(beat_map.trackId, {}).get("licence_name", ""),
+            licence_url=info.get(beat_map.trackId, {}).get("licence_url", ""),
         )
         for beat_map in sorted(beat_maps, key=lambda b: b.trackId)
     ]
@@ -197,6 +218,7 @@ def build_audio_index(
     audio_sources: dict[str, str],
     now: datetime | None = None,
     fixture_base_url: str = FIXTURE_AUDIO_BASE_URL,
+    stable_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """
     Assemble ``audio.json``: track id → where the preview may stream that recording.
@@ -205,8 +227,13 @@ def build_audio_index(
     property: the app refuses to play a link whose hash does not match the beat grid it is
     about to cut against, so a recording swapped between two Factory runs produces a click
     rather than a reel whose cuts are all quietly in the wrong place.
+
+    ``stable_ids`` names the tracks whose links do not expire on a clock — the royalty-free
+    section. Instagram's links die in about a day and a half and get an expiry either read
+    from the URL or assumed; a stable link gets none, exactly like the test tracks.
     """
     stamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    stable = stable_ids or set()
 
     audio: dict[str, Any] = {}
     for beat_map in sorted(beat_maps, key=lambda b: b.trackId):
@@ -217,6 +244,8 @@ def build_audio_index(
         if link is None:
             continue
         url, expires_at = link
+        if beat_map.trackId in stable:
+            expires_at = None
         audio[beat_map.trackId] = {
             "url": url,
             "expiresAt": expires_at,
@@ -248,6 +277,7 @@ def write_audio_index_only(
     audio_sources: dict[str, str],
     out_dir: Path | None = None,
     now: datetime | None = None,
+    stable_ids: set[str] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """
     Republish just the links, leaving the catalogue and every beat map exactly as they are.
@@ -264,7 +294,7 @@ def write_audio_index_only(
     destination = out_dir or OUT_DIR
     destination.mkdir(parents=True, exist_ok=True)
 
-    index = build_audio_index(beat_maps, audio_sources, now)
+    index = build_audio_index(beat_maps, audio_sources, now, stable_ids=stable_ids)
     index = _carry_over_generated_at(index, destination / AUDIO_INDEX_FILENAME, "indexHash")
     _write_json(destination / AUDIO_INDEX_FILENAME, index)
     return destination, index
@@ -306,6 +336,8 @@ def write_local(
     out_dir: Path | None = None,
     now: datetime | None = None,
     audio_sources: dict[str, str] | None = None,
+    track_info: dict[str, dict[str, str]] | None = None,
+    stable_ids: set[str] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Write the catalogue and every beat map atomically. Returns (out_dir, catalogue)."""
     if not beat_maps:
@@ -324,13 +356,15 @@ def write_local(
         for beat_map in beat_maps:
             _write_json(staging / BEATMAP_DIRNAME / f"{beat_map.trackId}.json", beat_map.to_json())
 
-        catalogue = build_catalogue(beat_maps, templates, now)
+        catalogue = build_catalogue(beat_maps, templates, now, track_info)
         catalogue = _carry_over_generated_at(
             catalogue, destination / CATALOGUE_FILENAME, "catalogueHash"
         )
         _write_json(staging / CATALOGUE_FILENAME, catalogue)
 
-        audio_index = build_audio_index(beat_maps, audio_sources or {}, now)
+        audio_index = build_audio_index(
+            beat_maps, audio_sources or {}, now, stable_ids=stable_ids
+        )
         audio_index = _carry_over_generated_at(
             audio_index, destination / AUDIO_INDEX_FILENAME, "indexHash"
         )

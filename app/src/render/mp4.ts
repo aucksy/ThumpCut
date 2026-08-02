@@ -233,11 +233,31 @@ export interface ValidationResult {
   summary: Mp4Summary | null;
 }
 
+export interface ValidateOptions {
+  /**
+   * Whether the file is supposed to carry the music.
+   *
+   * False — the default, and the only value an Instagram-catalogue export ever uses — means
+   * *no audio track at all*, exactly as before. True is for the user's own music and
+   * royalty-free tracks: then the file must carry exactly one audio track, running the same
+   * length as the picture. Neither mode tolerates the other's file.
+   */
+  expectAudio?: boolean;
+}
+
+/** How far the audio track's length may sit from the video's. */
+export const AUDIO_DURATION_TOLERANCE_SEC = 0.25;
+
 /**
  * Every §2.1 assertion. A file that fails any one of them is not saved — the user gets an
  * error and a retry, never a broken reel in their gallery.
  */
-export function validateExport(bytes: Uint8Array, expectedDurationSec: number): ValidationResult {
+export function validateExport(
+  bytes: Uint8Array,
+  expectedDurationSec: number,
+  options: ValidateOptions = {},
+): ValidationResult {
+  const expectAudio = options.expectAudio === true;
   const failures: string[] = [];
   let summary: Mp4Summary;
 
@@ -259,8 +279,30 @@ export function validateExport(bytes: Uint8Array, expectedDurationSec: number): 
   const videoTracks = summary.tracks.filter((track) => track.handler === "vide");
   const audioTracks = summary.tracks.filter((track) => track.handler === "soun");
 
-  if (audioTracks.length > 0) {
+  if (!expectAudio && audioTracks.length > 0) {
     failures.push(`the file carries ${audioTracks.length} audio track(s); it must carry none`);
+  }
+  if (expectAudio) {
+    if (audioTracks.length !== 1) {
+      failures.push(
+        `expected exactly one audio track carrying the music, found ${audioTracks.length}`,
+      );
+    } else {
+      const audio = audioTracks[0] as Mp4Track;
+      if (audio.hasEditList) {
+        failures.push("the audio track has an edit list, which shifts playback start");
+      }
+      const videoDuration = videoTracks[0]?.durationSec ?? summary.durationSec;
+      if (
+        audio.durationSec > 0 &&
+        Math.abs(audio.durationSec - videoDuration) > AUDIO_DURATION_TOLERANCE_SEC
+      ) {
+        failures.push(
+          `the audio runs ${audio.durationSec.toFixed(3)}s against ` +
+            `${videoDuration.toFixed(3)}s of picture`,
+        );
+      }
+    }
   }
   if (videoTracks.length !== 1) {
     failures.push(`expected exactly one video track, found ${videoTracks.length}`);
