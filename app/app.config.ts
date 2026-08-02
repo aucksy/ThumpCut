@@ -13,12 +13,16 @@ import type { ExpoConfig } from "expo/config";
  *     and no way to turn it off, so there is nothing here to configure.
  */
 
+import { version as packageVersion } from "./package.json";
+
 const META_APP_ID = process.env.EXPO_PUBLIC_META_APP_ID ?? "";
 
 const config: ExpoConfig = {
   name: "ThumpCut",
   slug: "thumpcut",
-  version: "1.0.0",
+  // One place, so the number in the file you download, the number on the release, and the
+  // number the Settings screen shows can never disagree.
+  version: packageVersion,
   orientation: "portrait",
   scheme: "thumpcut",
   userInterfaceStyle: "dark",

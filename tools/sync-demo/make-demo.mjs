@@ -166,8 +166,25 @@ if (!audioPath) {
       `  named to match the track id in the catalogue.`,
   );
 }
+/**
+ * `--embed` folds the audio into the page as a data URI, so the whole demo is one file that
+ * can be mailed, opened from a download, or published — no folder to keep together and no
+ * server to run. Only ever used with the fixture tracks, which are ours; the owner's own
+ * music stays on his disk.
+ */
+const embed = process.argv.includes("--embed");
 const audioName = basename(audioPath);
-copyFileSync(audioPath, join(OUT, audioName));
+let audioSrc = audioName;
+
+if (embed) {
+  const mime =
+    { ".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".ogg": "audio/ogg" }[
+      extname(audioPath).toLowerCase()
+    ] ?? "application/octet-stream";
+  audioSrc = `data:${mime};base64,${readFileSync(audioPath).toString("base64")}`;
+} else {
+  copyFileSync(audioPath, join(OUT, audioName));
+}
 
 /** One cut list per template, so the same track can be heard cut five different ways. */
 const takes = [];
@@ -196,7 +213,7 @@ for (const template of catalogue.templates) {
 if (takes.length === 0) throw new Error("No template could cut this track with these items.");
 
 const payload = {
-  track: { title: track.title, artist: track.artist, bpm: track.bpm, audio: audioName },
+  track: { title: track.title, artist: track.artist, bpm: track.bpm, audio: audioSrc },
   beats: beatMap.beatsSec.map((value) => Number(value.toFixed(4))),
   downbeats: (beatMap.downbeatsSec ?? []).map((value) => Number(value.toFixed(4))),
   frames,
