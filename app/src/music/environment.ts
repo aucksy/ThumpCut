@@ -11,6 +11,7 @@ import type { BeatMap } from "@thumpcut/cut-engine";
 import {
   decodeAudio,
   readAudioMetadata,
+  renderPlayableCopy,
 } from "../../modules/audio-decode/src/index.ts";
 import type { LocalMusicEnvironment, LocalSong } from "./localTracks.ts";
 import { LOCAL_ANALYSIS_SAMPLE_RATE } from "./localTracks.ts";
@@ -100,6 +101,36 @@ export function createLocalMusicEnvironment(): LocalMusicEnvironment {
         file.write(JSON.stringify(beatMap));
       } catch {
         // A failed cache write costs a re-analysis next time, nothing more.
+      }
+    },
+
+    playableCopyPath(key: string) {
+      return new File(beatMapDir, `${key}.wav`).uri;
+    },
+
+    async fileExists(path: string) {
+      try {
+        return new File(path).exists;
+      } catch {
+        return false;
+      }
+    },
+
+    async renderPlayableCopy(uri: string, toPath: string, maxDurationSec: number) {
+      if (!beatMapDir.exists) beatMapDir.create({ intermediates: true });
+      await renderPlayableCopy(uri, toPath, maxDurationSec);
+    },
+
+    async removeOtherPlayableCopies(keepKey: string) {
+      try {
+        if (!beatMapDir.exists) return;
+        for (const entry of beatMapDir.list()) {
+          if (entry instanceof File && entry.name.endsWith(".wav") && entry.name !== `${keepKey}.wav`) {
+            entry.delete();
+          }
+        }
+      } catch {
+        // A copy that will not delete costs disk, not correctness.
       }
     },
   };

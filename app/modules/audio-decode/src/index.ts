@@ -13,6 +13,13 @@ export interface DecodedAudioInfo {
   sampleRate: number;
 }
 
+export interface PlayableCopyInfo {
+  frames: number;
+  durationSec: number;
+  sampleRate: number;
+  channels: number;
+}
+
 export interface AudioFileMetadata {
   title: string | null;
   artist: string | null;
@@ -21,6 +28,7 @@ export interface AudioFileMetadata {
 
 interface AudioDecodeNativeModule {
   decode(uri: string, targetSampleRate: number, outputPath: string): Promise<DecodedAudioInfo>;
+  decodeToWav(uri: string, outputPath: string, maxDurationSec: number): Promise<PlayableCopyInfo>;
   readMetadata(uri: string): Promise<AudioFileMetadata>;
 }
 
@@ -49,4 +57,19 @@ export async function decodeAudio(
 export async function readAudioMetadata(uri: string): Promise<AudioFileMetadata> {
   if (!native) throw new AudioDecodeUnavailableError();
   return native.readMetadata(uri);
+}
+
+/**
+ * Render the exact playable copy of a song: a plain PCM WAV, cut off after
+ * `maxDurationSec`. The preview plays it and the export embeds it, so the clock the beat
+ * map was measured on and the clock the phone plays are the same clock — compressed
+ * formats carry hidden start padding and imprecise seeking, and this copy carries neither.
+ */
+export async function renderPlayableCopy(
+  uri: string,
+  outputPath: string,
+  maxDurationSec: number,
+): Promise<PlayableCopyInfo> {
+  if (!native) throw new AudioDecodeUnavailableError();
+  return native.decodeToWav(uri, outputPath, maxDurationSec);
 }

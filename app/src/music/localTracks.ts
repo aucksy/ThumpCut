@@ -31,7 +31,12 @@ export interface LocalSong {
 export interface AnalysedLocalTrack {
   track: CatalogueTrack;
   beatMap: BeatMap;
-  /** The file itself — the preview plays it, and the export carries it. */
+  /**
+   * The exact playable copy — a PCM WAV rendered from the same decode the beat grid was
+   * measured on. The preview plays it and the export embeds it. Never the original file:
+   * a compressed file's player clock can sit tens of milliseconds off the analysis clock
+   * (encoder padding, approximate seeking), and this copy is how the two stay identical.
+   */
   fileUri: string;
 }
 
@@ -75,9 +80,23 @@ export interface LocalMusicEnvironment {
   ): Promise<BeatMap>;
   readCachedBeatMap(key: string): Promise<BeatMap | null>;
   writeCachedBeatMap(key: string, beatMap: BeatMap): Promise<void>;
+  /** Where the playable copy for `key` lives. Purely a path; may not exist yet. */
+  playableCopyPath(key: string): string;
+  fileExists(path: string): Promise<boolean>;
+  /** Render the exact PCM copy of `uri` at `toPath`, no longer than `maxDurationSec`. */
+  renderPlayableCopy(uri: string, toPath: string, maxDurationSec: number): Promise<void>;
+  /** Delete every playable copy except `keepKey`'s — the app holds one song's copy at a time. */
+  removeOtherPlayableCopies(keepKey: string): Promise<void>;
 }
 
 export const LOCAL_ANALYSIS_SAMPLE_RATE = 22050;
+
+/**
+ * How much of the song the playable copy keeps: everything up to the reel's start window
+ * plus this much beyond it. Reels are well under two minutes; the margin costs a few MB
+ * and removes any chance of the copy ending mid-reel.
+ */
+export const PLAYABLE_COPY_TAIL_SEC = 180;
 
 /** The cache identity of a file: same uri, same length, same mtime — same beat map. */
 export function cacheKeyFor(song: Pick<LocalSong, "uri" | "durationSec" | "modifiedAt">): string {
@@ -165,9 +184,35 @@ export class LocalMusicController {
       const key = cacheKeyFor(song);
       const trackId = trackIdFor(song);
 
+      // A cached analysis still needs its playable copy — the copy is transient (one song's
+      // worth is kept at a time) while the analysis is for ever, so the two can part ways.
       const cached = await this.environment.readCachedBeatMap(key);
       if (cached) {
-        return this.assemble(song, cached);
+        const copyPath = this.environment.playableCopyPath(key);
+        if (await this.environment.fileExists(copyPath)) {
+          return this.assemble(cached, copyPath);
+        }
+        this.emit({
+          status: "Analysing",
+          analysingId: song.id,
+          progress: 0,
+          message: COPY.music.analysing,
+        });
+        try {
+          await this.ensurePlayableCopy(song, cached, key);
+          if (generation !== this.generation) return null;
+          this.emit({ status: "Ready", analysingId: null, progress: 0, message: null });
+          return this.assemble(cached, copyPath);
+        } catch {
+          if (generation !== this.generation) return null;
+          this.emit({
+            status: "AnalysisFailed",
+            analysingId: null,
+            progress: 0,
+            message: COPY.music.analysisFailed,
+          });
+          return null;
+        }
       }
 
       this.emit({
@@ -198,14 +243,17 @@ export class LocalMusicController {
           { trackId, title, artist },
           (fraction) => {
             if (generation !== this.generation) return;
-            this.emit({ progress: Math.min(1, Math.max(0, fraction)) });
+            // The analysis owns the first nine tenths of the bar; the copy takes the rest.
+            this.emit({ progress: Math.min(1, Math.max(0, fraction)) * 0.9 });
           },
         );
 
         await this.environment.writeCachedBeatMap(key, beatMap);
+        await this.ensurePlayableCopy(song, beatMap, key);
+
         if (generation !== this.generation) return null;
         this.emit({ status: "Ready", analysingId: null, progress: 0, message: null });
-        return this.assemble(song, beatMap);
+        return this.assemble(beatMap, this.environment.playableCopyPath(key));
       } catch {
         if (generation !== this.generation) return null;
         this.emit({
@@ -247,7 +295,27 @@ export class LocalMusicController {
     this.generation += 1;
   }
 
-  private assemble(song: LocalSong, beatMap: BeatMap): AnalysedLocalTrack {
+  /**
+   * Render the exact PCM copy the preview and the export will use, and make room for it by
+   * dropping any other song's copy first. Cut off past the reel window — the copy exists
+   * for the stretch that will actually play, not for archiving the song.
+   */
+  private async ensurePlayableCopy(
+    song: LocalSong,
+    beatMap: BeatMap,
+    key: string,
+  ): Promise<void> {
+    await this.environment.removeOtherPlayableCopies(key);
+    const copyPath = this.environment.playableCopyPath(key);
+    if (await this.environment.fileExists(copyPath)) return;
+    const maxDurationSec = Math.min(
+      beatMap.durationSec,
+      beatMap.bestWindowStartSec + PLAYABLE_COPY_TAIL_SEC,
+    );
+    await this.environment.renderPlayableCopy(song.uri, copyPath, maxDurationSec);
+  }
+
+  private assemble(beatMap: BeatMap, playableUri: string): AnalysedLocalTrack {
     return {
       track: {
         trackId: beatMap.trackId,
@@ -260,7 +328,7 @@ export class LocalMusicController {
         source: "local",
       },
       beatMap,
-      fileUri: song.uri,
+      fileUri: playableUri,
     };
   }
 

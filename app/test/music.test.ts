@@ -61,10 +61,14 @@ class FakeMusicEnvironment implements LocalMusicEnvironment {
   permission: "granted" | "denied" = "granted";
   songs: LocalSong[] = [song()];
   cache = new Map<string, BeatMap>();
+  copies = new Set<string>();
   decodeCalls = 0;
   analyseCalls = 0;
+  renderCopyCalls: Array<{ uri: string; toPath: string; maxDurationSec: number }> = [];
+  cleanupCalls: string[] = [];
   deleted: string[] = [];
   analyseThrows = false;
+  renderCopyThrows = false;
   progressTicks: Array<(fraction: number) => void> = [];
 
   async requestPermission() {
@@ -104,6 +108,23 @@ class FakeMusicEnvironment implements LocalMusicEnvironment {
   async writeCachedBeatMap(key: string, beatMap: BeatMap) {
     this.cache.set(key, beatMap);
   }
+  playableCopyPath(key: string) {
+    return `file:///documents/localbeats/${key}.wav`;
+  }
+  async fileExists(path: string) {
+    return this.copies.has(path);
+  }
+  async renderPlayableCopy(uri: string, toPath: string, maxDurationSec: number) {
+    this.renderCopyCalls.push({ uri, toPath, maxDurationSec });
+    if (this.renderCopyThrows) throw new Error("no copy");
+    this.copies.add(toPath);
+  }
+  async removeOtherPlayableCopies(keepKey: string) {
+    this.cleanupCalls.push(keepKey);
+    for (const path of [...this.copies]) {
+      if (!path.endsWith(`${keepKey}.wav`)) this.copies.delete(path);
+    }
+  }
 }
 
 describe("scanning the phone's music", () => {
@@ -142,7 +163,7 @@ describe("scanning the phone's music", () => {
 });
 
 describe("analysing a song", () => {
-  it("produces a local track the normal flow can use", async () => {
+  it("produces a local track whose audio is the exact playable copy, never the original", async () => {
     const environment = new FakeMusicEnvironment();
     const controller = new LocalMusicController(environment);
     await controller.open();
@@ -152,8 +173,24 @@ describe("analysing a song", () => {
     assert.equal(analysed.track.source, "local");
     assert.equal(analysed.track.title, "Test Song");
     assert.equal(analysed.track.bpm, 120);
-    assert.equal(analysed.fileUri, "file:///music/song.mp3");
+    // The one-clock rule: preview and export play the copy rendered from the same decode
+    // the beat grid was measured on. The original compressed file is never handed to a
+    // player — its clock can sit off the analysis clock.
+    assert.ok(analysed.fileUri.endsWith(".wav"), analysed.fileUri);
+    assert.notEqual(analysed.fileUri, "file:///music/song.mp3");
+    assert.equal(environment.renderCopyCalls.length, 1);
+    assert.equal(environment.renderCopyCalls[0]?.uri, "file:///music/song.mp3");
     assert.ok(analysed.track.trackId.startsWith("local-"));
+  });
+
+  it("the copy is cut off past the reel window, not the whole song archived", async () => {
+    const environment = new FakeMusicEnvironment();
+    const controller = new LocalMusicController(environment);
+    await controller.open();
+    await controller.pick(song());
+
+    // The fake's beat map: 180s long, best window at 0 → copy capped at 0 + 180.
+    assert.equal(environment.renderCopyCalls[0]?.maxDurationSec, 180);
   });
 
   it("analyses once, then serves the cache instantly", async () => {
@@ -164,7 +201,48 @@ describe("analysing a song", () => {
     const second = await controller.pick(song());
 
     assert.equal(environment.analyseCalls, 1);
+    assert.equal(environment.renderCopyCalls.length, 1, "the copy is reused too");
     assert.ok(second);
+    assert.ok(second.fileUri.endsWith(".wav"));
+  });
+
+  it("a cached analysis whose copy was cleaned away re-renders the copy, not the analysis", async () => {
+    const environment = new FakeMusicEnvironment();
+    const controller = new LocalMusicController(environment);
+    await controller.open();
+    await controller.pick(song());
+
+    // Another song's pick would clean this copy; simulate the copy vanishing.
+    environment.copies.clear();
+    const again = await controller.pick(song());
+
+    assert.equal(environment.analyseCalls, 1, "no re-analysis");
+    assert.equal(environment.renderCopyCalls.length, 2, "the copy is re-rendered");
+    assert.ok(again);
+  });
+
+  it("only one song's copy is kept: picking cleans the others first", async () => {
+    const environment = new FakeMusicEnvironment();
+    environment.songs = [song(), song({ id: "s2", uri: "file:///music/other.mp3", filename: "other.mp3" })];
+    const controller = new LocalMusicController(environment);
+    await controller.open();
+    await controller.pick(song());
+    const firstCopy = environment.renderCopyCalls[0]?.toPath as string;
+    await controller.pick(environment.songs[1] as LocalSong);
+
+    assert.equal(environment.cleanupCalls.length, 2);
+    assert.equal(environment.copies.has(firstCopy), false, "the first song's copy is gone");
+  });
+
+  it("a copy that cannot be rendered is an honest failure, not a silently wrong player", async () => {
+    const environment = new FakeMusicEnvironment();
+    environment.renderCopyThrows = true;
+    const controller = new LocalMusicController(environment);
+    await controller.open();
+    const analysed = await controller.pick(song());
+
+    assert.equal(analysed, null);
+    assert.equal(controller.snapshot().status, "AnalysisFailed");
   });
 
   it("a changed file is a different song: the cache key moves with the mtime", () => {

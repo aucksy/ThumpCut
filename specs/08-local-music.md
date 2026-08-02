@@ -91,6 +91,8 @@ files over 15 minutes (refused with a plain error before any work).
 | LM5 | The beat engine is the Factory's algorithm — held to the Factory's published answers by a parity test over the committed fixture WAVs. |
 | LM6 | Songs shorter than 10 seconds are never offered. |
 | LM7 | A local track never enters the published catalogue and never leaves the device. |
+| LM8 | **One clock.** The preview plays, and the export embeds, an exact PCM copy rendered from the same decode the beat grid was measured on — never the original compressed file. An MP3 has two clocks (encoder padding a player may strip; seeks that land only *near* the target on VBR files), and the beat map's promise only holds against its own clock. Device-reported before this rule existed: cuts off the beat on the owner's MP3s while the WAV test tracks were exact. |
+| LM9 | The playable copy is transient: one song's copy at a time, cut off past the reel window, re-rendered on demand when a cached analysis outlives it. |
 
 ## 7. Tests and Definition of Done
 

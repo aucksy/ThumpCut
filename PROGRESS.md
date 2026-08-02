@@ -13,7 +13,7 @@ Last updated: 2026-08-02, second session.
 | 05 Preview | ☑ | ☑ | ☐ | Plays the real track. The phone's own player is unproven. |
 | 06 Render | ☑ | ☑ | ☐ | Now two modes: silent, and music-inside. Both validated; memory needs a phone. |
 | 07 Instagram handoff | ☑ | ☑ | ☐ | Blocked on a Meta app id. See OPEN-QUESTIONS. |
-| 08 Your music | ☑ | ☑ | ☐ | **New.** Local files analysed on the device. Whole path is phone-ready, unproven on one. |
+| 08 Your music | ☑ | ☑ | ☐ | **New.** First device report: cuts off the beat on real MP3s (fine on the WAV test tracks). Root cause found — an MP3's player clock is not its decode clock — and fixed the structural way: the app renders an exact PCM copy at analysis time and plays/embeds only that (LM8). Needs the re-test. |
 | 09 Royalty-free | ☑ | ☑ | ☐ | **New.** Jamendo section built end to end against stubs; needs the free key. |
 | 10 Share anywhere | ☑ | ☑ | ☐ | **New.** YouTube + system sheet for reels that carry music. |
 | Design system | ☑ | ☑ | ☐ | 54 screen states rendered, measured and screenshotted on every push. |

@@ -13,8 +13,10 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.min
 
 /**
  * Decoding a song into raw samples for the beat engine.
@@ -40,6 +42,7 @@ class AudioDecodeModule : Module() {
     private const val MAX_DURATION_SEC = 900.0
     private const val CODEC_TIMEOUT_US = 10_000L
     private const val WRITE_BUFFER_BYTES = 64 * 1024
+    private const val WAV_HEADER_BYTES = 44
   }
 
   override fun definition() = ModuleDefinition {
@@ -56,6 +59,29 @@ class AudioDecodeModule : Module() {
         throw CodedException("ERR_BAD_RATE", "Unsupported analysis sample rate.", null)
       }
       decodeToFile(context, uri, targetSampleRate, outputPath)
+    }
+
+    /**
+     * Decode `uri` into a plain PCM WAV at `outputPath`, stopping after `maxDurationSec`.
+     *
+     * This copy is why the preview and the export stay on the beat for the user's own
+     * music. A compressed file has two clocks: the one the beat engine measured (an exact
+     * decode from time zero) and the one a player produces (which may skip encoder padding,
+     * and lands only *near* a mid-file seek target on variable-bitrate MP3s). A PCM WAV has
+     * one clock — every sample has an exact address — so playing and embedding this copy
+     * makes the player's clock identical to the beat map's, by construction.
+     *
+     * Source sample rate and channel layout are preserved (many-channel sources fold to
+     * stereo), so the copy sounds like the original. It is transient: the app keeps one at
+     * a time and re-renders it when the song changes.
+     */
+    AsyncFunction("decodeToWav") { uri: String, outputPath: String, maxDurationSec: Double ->
+      val context = appContext.reactContext
+        ?: throw CodedException("ERR_NO_CONTEXT", "The app has no context to decode in.", null)
+      if (maxDurationSec <= 0 || maxDurationSec > MAX_DURATION_SEC) {
+        throw CodedException("ERR_BAD_RATE", "Unsupported copy length.", null)
+      }
+      decodeToWavFile(context, uri, outputPath, maxDurationSec)
     }
 
     /** Title, artist and duration as the file itself declares them. Never throws for tags. */
@@ -259,6 +285,242 @@ class AudioDecodeModule : Module() {
       "durationSec" to frames.toDouble() / targetSampleRate,
       "sampleRate" to targetSampleRate
     )
+  }
+
+  /**
+   * The playable copy: decode to interleaved 16-bit PCM at the source rate, stopping after
+   * `maxDurationSec`, and finish by writing the true sizes into the WAV header.
+   */
+  private fun decodeToWavFile(
+    context: Context,
+    uri: String,
+    outputPath: String,
+    maxDurationSec: Double,
+  ): Map<String, Any> {
+    val extractor = MediaExtractor()
+    try {
+      if (uri.startsWith("content://")) {
+        extractor.setDataSource(context, Uri.parse(uri), null)
+      } else {
+        extractor.setDataSource(uri.removePrefix("file://"))
+      }
+    } catch (error: Throwable) {
+      extractor.release()
+      throw CodedException("ERR_UNREADABLE", "That file could not be read.", error)
+    }
+
+    var trackIndex = -1
+    var format: MediaFormat? = null
+    for (index in 0 until extractor.trackCount) {
+      val candidate = extractor.getTrackFormat(index)
+      if (candidate.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) {
+        trackIndex = index
+        format = candidate
+        break
+      }
+    }
+    if (trackIndex < 0 || format == null) {
+      extractor.release()
+      throw CodedException("ERR_NO_AUDIO", "That file has no audio in it.", null)
+    }
+    extractor.selectTrack(trackIndex)
+    val mime = format.getString(MediaFormat.KEY_MIME)
+      ?: throw CodedException("ERR_NO_AUDIO", "That file has no audio in it.", null)
+
+    val output = File(outputPath.removePrefix("file://"))
+    output.parentFile?.mkdirs()
+    if (output.exists()) output.delete()
+
+    var codec: MediaCodec? = null
+    var frames = 0L
+    var sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+    var sourceChannels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+    var pcmEncoding =
+      if (format.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
+        format.getInteger(MediaFormat.KEY_PCM_ENCODING)
+      } else AudioFormat.ENCODING_PCM_16BIT
+    var outChannels = min(sourceChannels, 2).coerceAtLeast(1)
+
+    try {
+      codec = MediaCodec.createDecoderByType(mime)
+      codec.configure(format, null, null, 0)
+      codec.start()
+
+      RandomAccessFile(output, "rw").use { file ->
+        // A placeholder header; the sizes are written once they are known.
+        file.write(ByteArray(WAV_HEADER_BYTES))
+
+        val chunk = ByteBuffer.allocate(WRITE_BUFFER_BYTES).order(ByteOrder.LITTLE_ENDIAN)
+        val flush = {
+          file.write(chunk.array(), 0, chunk.position())
+          chunk.clear()
+        }
+        val emitFrame = { left: Float, right: Float ->
+          if (chunk.remaining() < 4) flush()
+          chunk.putShort(pcm16(left))
+          if (outChannels == 2) chunk.putShort(pcm16(right))
+          frames += 1
+        }
+
+        val info = MediaCodec.BufferInfo()
+        var inputDone = false
+        var outputDone = false
+        val maxFrames = { (maxDurationSec * sampleRate).toLong() }
+
+        while (!outputDone && frames < maxFrames()) {
+          if (!inputDone) {
+            val inputIndex = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
+            if (inputIndex >= 0) {
+              val buffer = codec.getInputBuffer(inputIndex)
+                ?: throw CodedException("ERR_DECODE", "The decoder gave no buffer.", null)
+              val read = extractor.readSampleData(buffer, 0)
+              if (read < 0) {
+                codec.queueInputBuffer(
+                  inputIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM
+                )
+                inputDone = true
+              } else {
+                codec.queueInputBuffer(inputIndex, 0, read, extractor.sampleTime, 0)
+                extractor.advance()
+              }
+            }
+          }
+
+          val outputIndex = codec.dequeueOutputBuffer(info, CODEC_TIMEOUT_US)
+          when {
+            outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+              val actual = codec.outputFormat
+              sampleRate = actual.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+              sourceChannels = actual.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+              pcmEncoding =
+                if (actual.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
+                  actual.getInteger(MediaFormat.KEY_PCM_ENCODING)
+                } else AudioFormat.ENCODING_PCM_16BIT
+              outChannels = min(sourceChannels, 2).coerceAtLeast(1)
+            }
+            outputIndex >= 0 -> {
+              val buffer = codec.getOutputBuffer(outputIndex)
+              if (buffer != null && info.size > 0) {
+                buffer.position(info.offset)
+                buffer.limit(info.offset + info.size)
+                foldFrames(buffer, pcmEncoding, sourceChannels, emitFrame)
+              }
+              codec.releaseOutputBuffer(outputIndex, false)
+              if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
+            }
+          }
+        }
+        flush()
+
+        writeWavHeader(file, sampleRate, outChannels, frames)
+      }
+    } catch (error: CodedException) {
+      output.delete()
+      throw error
+    } catch (error: Throwable) {
+      output.delete()
+      throw CodedException("ERR_DECODE", "That file could not be decoded.", error)
+    } finally {
+      try {
+        codec?.stop()
+      } catch (_: Throwable) {
+        // Never started, or already dead.
+      }
+      codec?.release()
+      extractor.release()
+    }
+
+    if (frames == 0L) {
+      output.delete()
+      throw CodedException("ERR_DECODE", "That file decoded to nothing.", null)
+    }
+
+    return mapOf(
+      "frames" to frames,
+      "durationSec" to frames.toDouble() / sampleRate,
+      "sampleRate" to sampleRate,
+      "channels" to outChannels
+    )
+  }
+
+  /** One decoder buffer as stereo-or-mono frames; sources beyond two channels fold down. */
+  private fun foldFrames(
+    buffer: ByteBuffer,
+    pcmEncoding: Int,
+    channels: Int,
+    emitFrame: (Float, Float) -> Unit,
+  ) {
+    val safeChannels = if (channels < 1) 1 else channels
+    if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
+      val floats = buffer.order(ByteOrder.nativeOrder()).asFloatBuffer()
+      val frameCount = floats.remaining() / safeChannels
+      for (frame in 0 until frameCount) {
+        var left = 0f
+        var right = 0f
+        for (channel in 0 until safeChannels) {
+          val sample = floats.get(frame * safeChannels + channel)
+          if (safeChannels == 1 || channel % 2 == 0) left += sample else right += sample
+        }
+        emitStereo(safeChannels, left, right, emitFrame)
+      }
+    } else {
+      val shorts = buffer.order(ByteOrder.nativeOrder()).asShortBuffer()
+      val frameCount = shorts.remaining() / safeChannels
+      for (frame in 0 until frameCount) {
+        var left = 0f
+        var right = 0f
+        for (channel in 0 until safeChannels) {
+          val sample = shorts.get(frame * safeChannels + channel) / 32768f
+          if (safeChannels == 1 || channel % 2 == 0) left += sample else right += sample
+        }
+        emitStereo(safeChannels, left, right, emitFrame)
+      }
+    }
+  }
+
+  private fun emitStereo(
+    sourceChannels: Int,
+    leftSum: Float,
+    rightSum: Float,
+    emitFrame: (Float, Float) -> Unit,
+  ) {
+    if (sourceChannels <= 2) {
+      emitFrame(leftSum, if (sourceChannels == 2) rightSum else leftSum)
+      return
+    }
+    val half = (sourceChannels + 1) / 2
+    emitFrame(leftSum / half, rightSum / (sourceChannels / 2))
+  }
+
+  private fun pcm16(value: Float): Short {
+    val scaled = (value * 32767f).toInt()
+    return scaled.coerceIn(-32768, 32767).toShort()
+  }
+
+  /** The 44-byte canonical PCM WAV header, written over the placeholder once sizes exist. */
+  private fun writeWavHeader(
+    file: RandomAccessFile,
+    sampleRate: Int,
+    channels: Int,
+    frames: Long,
+  ) {
+    val dataBytes = frames * channels * 2
+    val header = ByteBuffer.allocate(WAV_HEADER_BYTES).order(ByteOrder.LITTLE_ENDIAN)
+    header.put("RIFF".toByteArray(Charsets.US_ASCII))
+    header.putInt((36 + dataBytes).toInt())
+    header.put("WAVE".toByteArray(Charsets.US_ASCII))
+    header.put("fmt ".toByteArray(Charsets.US_ASCII))
+    header.putInt(16)
+    header.putShort(1) // PCM
+    header.putShort(channels.toShort())
+    header.putInt(sampleRate)
+    header.putInt(sampleRate * channels * 2)
+    header.putShort((channels * 2).toShort())
+    header.putShort(16)
+    header.put("data".toByteArray(Charsets.US_ASCII))
+    header.putInt(dataBytes.toInt())
+    file.seek(0)
+    file.write(header.array())
   }
 
   /** Average the channels of one decoder buffer to mono and feed the resampler. */
