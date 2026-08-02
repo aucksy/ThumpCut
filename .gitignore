@@ -13,7 +13,11 @@ __pycache__/
 .venv/
 artifacts/
 *.tsbuildinfo
-android/
-ios/
+
+# The native projects Expo generates on every build. Anchored to where they are generated:
+# an unanchored `android/` also matched app/modules/*/android, which is hand-written source,
+# and quietly kept the entire renderer and the Instagram share module out of the repository.
+/app/android/
+/app/ios/
 .DS_Store
 Thumbs.db

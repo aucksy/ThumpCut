@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "test": "node --test --experimental-strip-types \"test/*.test.ts\"",
-    "prebuild": "expo prebuild --clean"
+    "prebuild": "expo prebuild --clean",
+    "prebuild:android": "expo prebuild --platform android --no-install --clean"
   },
   "dependencies": {
     "@thumpcut/cut-engine": "*",

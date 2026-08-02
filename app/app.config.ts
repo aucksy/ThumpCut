@@ -24,7 +24,12 @@ const config: ExpoConfig = {
   userInterfaceStyle: "dark",
   backgroundColor: "#17181A",
 
+  // Generated from the design tokens by `npm run icons`. Without these the build ships Expo's
+  // placeholder, which on a home screen looks like an app that was never finished.
+  icon: "./assets/icon/icon.png",
+
   splash: {
+    image: "./assets/icon/splash-icon.png",
     backgroundColor: "#17181A",
     resizeMode: "contain",
   },
@@ -54,12 +59,16 @@ const config: ExpoConfig = {
       "android.permission.READ_EXTERNAL_STORAGE",
     ],
     adaptiveIcon: {
+      foregroundImage: "./assets/icon/adaptive-icon.png",
       backgroundColor: "#17181A",
     },
   },
 
   plugins: [
     "expo-router",
+    // Declares the FileProvider the share module builds its content URI from, and makes
+    // Instagram visible to the package manager. Both fail silently if they are missing.
+    "./plugins/withAndroidShare",
     [
       "expo-image-picker",
       { photosPermission: "ThumpCut needs access to your photos to make a reel." },

@@ -1,0 +1,25 @@
+// The Android half of the Instagram handoff.
+//
+// Nothing exotic is needed here — the module is an Intent and a FileProvider URI — but the
+// file has to exist or the Kotlin never compiles and the share button silently never appears.
+
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.instagramshare'
+version = '0.1.0'
+
+android {
+  namespace 'expo.modules.instagramshare'
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}
+
+dependencies {
+  // FileProvider. A raw file:// URI throws FileUriExposedException on every modern Android.
+  implementation 'androidx.core:core-ktx:1.13.1'
+}

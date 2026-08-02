@@ -1,0 +1,39 @@
+// The Android half of the reel renderer.
+//
+// Without this file the module has Kotlin source and no way to compile it, and the app builds
+// with the renderer silently missing — `requireOptionalNativeModule` returns null and Export
+// fails with "the renderer is not available in this build". That is exactly the shape of bug
+// this project has been bitten by before, so the Media3 dependency lives here explicitly
+// rather than being inherited from anything.
+//
+// Media3 Transformer is the composer. `react-native-media-toolkit` crops and trims a single
+// file and cannot compose a timeline — see DECISIONS.md 2026-08-01.
+
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.reelrender'
+version = '0.1.0'
+
+// Pinned, not a range. A floating version means a build that passed yesterday can fail today
+// for reasons no one changed.
+def media3Version = '1.10.1'
+
+android {
+  namespace 'expo.modules.reelrender'
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}
+
+dependencies {
+  implementation "androidx.media3:media3-common:${media3Version}"
+  implementation "androidx.media3:media3-transformer:${media3Version}"
+  implementation "androidx.media3:media3-effect:${media3Version}"
+  // The in-app muxer, which writes the moov atom at the front of the file. The platform
+  // MediaMuxer writes it at the end, and the export validator rejects that outright.
+  implementation "androidx.media3:media3-muxer:${media3Version}"
+}

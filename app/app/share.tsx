@@ -28,7 +28,12 @@ const META_APP_ID =
 
 function createShareEnvironment(): ShareEnvironment {
   return {
-    isInstagramAvailable: () => isAvailable(),
+    // S1 — the button is shown only when the share can actually be accepted, and absent
+    // otherwise. Instagram silently ignores a share carrying no application id, so a build
+    // without one cannot hand anything off; offering the button would be a promise the app
+    // cannot keep, and the failure would look like Instagram's fault rather than a missing
+    // setting.
+    isInstagramAvailable: async () => META_APP_ID !== "" && (await isAvailable()),
     shareToReels: (videoUri) => shareToReels(videoUri, META_APP_ID),
     async saveToGallery(videoUri) {
       const permission = await MediaLibrary.requestPermissionsAsync();

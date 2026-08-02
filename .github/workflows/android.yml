@@ -1,0 +1,129 @@
+name: Android APK
+
+# Builds an installable Android app on every push to main and publishes it as a GitHub
+# Release, so it can be downloaded straight onto a phone from the browser. Nothing here
+# needs a laptop, an Android SDK, or an Expo account.
+#
+# This is a *release* build, not a development build: the JavaScript is compiled into the
+# APK. A development build would need Metro running on a computer on the same network, which
+# defeats the point.
+#
+# It is signed with the standard Android debug key, which is fixed and identical on every
+# run — so a new build installs over the top of the old one rather than demanding an
+# uninstall. That key is fine for testing and must never be used for the Play Store.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+env:
+  # One tag, reused. The download link never changes.
+  RELEASE_TAG: latest-android
+  # Where the app fetches the song list and beat maps. Published by catalogue.yml.
+  # Baked into the APK at build time — there is no settings screen to change it on the phone.
+  EXPO_PUBLIC_CATALOGUE_URL: https://aucksy.github.io/ThumpCut
+  # Instagram silently ignores a share with no application id. Until this is set the share
+  # module refuses to fire and says so, rather than opening an empty composer.
+  EXPO_PUBLIC_META_APP_ID: ${{ secrets.META_APP_ID }}
+
+jobs:
+  apk:
+    name: Build the APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('app/package.json', 'package-lock.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate the native Android project
+        run: npm run prebuild:android
+
+      - name: Give Gradle enough heap for a release build
+        # The template ships 2GB, which is fine on a workstation and marginal here. Last
+        # entry in the file wins.
+        run: echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g" >> app/android/gradle.properties
+
+      - name: Build
+        working-directory: app/android
+        # The wrapper is generated fresh above; make sure it is runnable.
+        shell: bash
+        # Phone architectures only. Dropping the two emulator ones roughly halves the file
+        # the owner has to download over mobile data.
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon --stacktrace
+
+      - name: Collect it
+        id: collect
+        run: |
+          set -euo pipefail
+          built=$(find app/android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          if [ -z "$built" ]; then
+            echo "No APK was produced." >&2
+            exit 1
+          fi
+          mkdir -p out
+          cp "$built" out/ThumpCut.apk
+          size=$(du -h out/ThumpCut.apk | cut -f1)
+          echo "size=$size" >> "$GITHUB_OUTPUT"
+          echo "Built ThumpCut.apk ($size)"
+
+      - name: Keep a copy against this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThumpCut-apk
+          path: out/ThumpCut.apk
+          retention-days: 30
+
+      - name: Publish it where a phone can reach it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes=$(cat <<NOTES
+          **Tap \`ThumpCut.apk\` below on your phone to install it.**
+
+          Built from \`${GITHUB_SHA:0:7}\` — $(git log -1 --pretty=%s)
+
+          Size: ${{ steps.collect.outputs.size }}
+
+          This is a test build signed with a test key. Android will warn you that it is from
+          an unknown developer; that is expected. It installs over any earlier ThumpCut
+          without uninstalling first.
+          NOTES
+          )
+          # Replaced rather than added to, so the download link is always the newest build.
+          gh release delete "$RELEASE_TAG" --yes --cleanup-tag || true
+          gh release create "$RELEASE_TAG" out/ThumpCut.apk \
+            --target "$GITHUB_SHA" \
+            --title "ThumpCut — latest Android build" \
+            --notes "$notes" \
+            --latest
