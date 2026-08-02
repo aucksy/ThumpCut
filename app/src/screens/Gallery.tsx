@@ -98,8 +98,8 @@ export function GalleryScreen({
         ))}
       </ScrollView>
 
-      <View style={styles.createRow} pointerEvents="box-none">
-        <Button onPress={onCreate} style={styles.createButton} testID="gallery-create">
+      <View style={styles.createRow}>
+        <Button full onPress={onCreate} testID="gallery-create">
           {COPY.gallery.create}
         </Button>
       </View>
@@ -137,17 +137,17 @@ const styles = StyleSheet.create({
     gap: space.s3,
     paddingHorizontal: layout.screenPad,
     paddingTop: space.s3,
-    paddingBottom: 108,
+    paddingBottom: space.s3,
   },
   // A fixed width, never flexGrow: a lone card on the last row was stretching to the full
   // width of the screen and becoming a 568pt-tall slab.
   cell: { width: "48%", flexGrow: 0, flexShrink: 0 },
+  // In the layout, not floating over it. Absolutely positioned, this pill sat on top of the
+  // card titles as they scrolled past and read as a rendering fault. Every other screen in the
+  // app puts its primary action in a footer below the scrolling area; so does this one now.
   createRow: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 26,
-    alignItems: "center",
+    paddingHorizontal: layout.screenPad,
+    paddingTop: 14,
+    paddingBottom: 34,
   },
-  createButton: { paddingHorizontal: 34 },
 });

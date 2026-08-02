@@ -27,11 +27,8 @@ concurrency:
 env:
   # One tag, reused. The download link never changes.
   RELEASE_TAG: latest-android
-  # Where the app fetches the song list and beat maps. Published by catalogue.yml.
-  # Baked into the APK at build time — there is no settings screen to change it on the phone.
-  EXPO_PUBLIC_CATALOGUE_URL: https://aucksy.github.io/ThumpCut
   # Instagram silently ignores a share with no application id. Until this is set the share
-  # module refuses to fire and says so, rather than opening an empty composer.
+  # button is absent rather than broken — see app/app/share.tsx.
   EXPO_PUBLIC_META_APP_ID: ${{ secrets.META_APP_ID }}
 
 jobs:
@@ -65,6 +62,15 @@ jobs:
       - name: Install
         run: npm ci --no-audit --no-fund
 
+      - name: Point the app at this commit's catalogue
+        # Pinned to the commit rather than to the branch: a CDN caches a branch for hours, and
+        # a phone fetching yesterday's song list against today's app is a bug nobody can see.
+        # Baked in at bundle time — there is no setting to change it on the phone.
+        run: |
+          url="https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${GITHUB_SHA}/catalogue"
+          echo "EXPO_PUBLIC_CATALOGUE_URL=$url" >> "$GITHUB_ENV"
+          echo "Songs will be fetched from $url"
+
       - name: Generate the native Android project
         run: npm run prebuild:android
 
@@ -75,11 +81,33 @@ jobs:
 
       - name: Build
         working-directory: app/android
-        # The wrapper is generated fresh above; make sure it is runnable.
-        shell: bash
         # Phone architectures only. Dropping the two emulator ones roughly halves the file
         # the owner has to download over mobile data.
-        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          chmod +x ./gradlew
+          ./gradlew :app:assembleRelease \
+            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a \
+            --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle.log"
+
+      - name: Leave the build log somewhere readable
+        if: failure()
+        # Action logs need a GitHub login to read, which makes a failed cloud build hard to
+        # diagnose from outside. The tail of the log goes to a branch nobody else looks at.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d)
+          tail -n 1500 "$RUNNER_TEMP/gradle.log" > "$work/android-build.log"
+          cd "$work"
+          git init -q
+          git checkout -q -b ci-logs
+          git add android-build.log
+          git -c user.name=ci -c user.email=ci@thumpcut.invalid \
+            commit -qm "Android build log for ${GITHUB_SHA}"
+          git push -q --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-logs
 
       - name: Collect it
         id: collect

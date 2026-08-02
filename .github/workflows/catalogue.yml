@@ -1,15 +1,19 @@
 name: Catalogue
 
-# Publishes the song list and beat maps to GitHub Pages, which is where the app fetches them
-# from. Free, static, no bucket, no account — it is exactly the "static host and a public URL"
-# that OPEN-QUESTIONS asks for, so the app has somewhere to point until a real one exists.
+# Keeps the published song list and beat maps in step with the Factory.
 #
-# With no Meta credentials the Factory runs in fixture mode and publishes three test tracks at
+# The catalogue lives in the repository, under `catalogue/`, and is served to phones straight
+# from GitHub by jsDelivr — a free CDN that mirrors public repositories and, unlike GitHub's
+# own raw file host, serves JSON with a JSON content type. The app rejects anything else,
+# because a hotel wifi login page also answers with a 200.
+#
+# That choice buys one thing that matters more than elegance here: **nothing has to be
+# switched on by hand.** GitHub Pages would be the tidier home, but it cannot be enabled by a
+# workflow — it needs someone to visit repository settings, and the owner should not have to.
+#
+# With no Meta credentials the Factory runs in fixture mode and produces three test tracks at
 # 96, 124 and 150 BPM, credited to "ThumpCut Test Kit" so nobody mistakes them for real music.
-# Everything except "do the cuts land on the beat of a real Instagram track" can be tested
-# against them.
-#
-# Set META_ACCESS_TOKEN as a repository secret and this same workflow publishes the real
+# Add META_ACCESS_TOKEN as a repository secret and this same workflow publishes the real
 # catalogue instead, with no other change.
 
 on:
@@ -21,17 +25,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: catalogue
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Generate it
+  publish:
+    name: Regenerate and commit it
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,30 +50,23 @@ jobs:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
-          python -m factory.run --no-upload --out site --tmp "$RUNNER_TEMP/tmp"
+          rm -rf catalogue
+          python -m factory.run --no-upload --out catalogue --tmp "$RUNNER_TEMP/tmp"
           # P1 — no audio may survive a run.
           test -z "$(ls -A "$RUNNER_TEMP/tmp" 2>/dev/null)" || (echo "audio left on disk" && exit 1)
-          # Pages would otherwise run the whole thing through Jekyll.
-          touch site/.nojekyll
-          echo "Publishing:"
-          find site -type f | sort
+          find catalogue -type f | sort
 
-      - uses: actions/configure-pages@v5
-        with:
-          # Turns Pages on the first time, so this needs no visit to repository settings.
-          enablement: true
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    name: Put it online
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Commit it if it changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- catalogue; then
+            echo "The catalogue is unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalogue
+          # [skip ci] so republishing the catalogue does not kick off another APK build,
+          # which would republish the catalogue, which would...
+          git commit -m "Republish the catalogue [skip ci]"
+          git push
