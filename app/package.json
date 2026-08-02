@@ -15,6 +15,7 @@
     "@thumpcut/cut-engine": "*",
     "@thumpcut/design-tokens": "*",
     "expo": "55.0.28",
+    "expo-asset": "~55.0.18",
     "expo-audio": "55.0.16",
     "expo-build-properties": "~55.0.16",
     "expo-constants": "~55.0.17",

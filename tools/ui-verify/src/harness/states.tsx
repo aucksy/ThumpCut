@@ -9,6 +9,7 @@
 import type { ReactElement } from "react";
 import {
   ExportSheet,
+  FaultScreen,
   GalleryScreen,
   LaunchScreen,
   MediaSelectScreen,
@@ -342,6 +343,25 @@ export const SCREEN_STATES: ScreenState[] = [
     id: "09-settings",
     title: "Settings — almost empty, and that is the message",
     render: () => <SettingsScreen onBack={noop} exportQuality="1080p" version="ThumpCut 1.0.0 (1)" />,
+  },
+
+  // 10 · The screen of last resort. Never seen in normal use; measured anyway, because the one
+  // time it appears is the one time the owner is stuck and needs to be able to read it.
+  {
+    id: "10-fault",
+    title: "Startup failure — what the app shows instead of closing",
+    render: () => {
+      const error = new Error("Cannot read property 'downloadAsync' of undefined");
+      error.name = "TypeError";
+      error.stack = [
+        "TypeError: Cannot read property 'downloadAsync' of undefined",
+        "    at loadAsync (expo-font/build/FontLoader.js:41:19)",
+        "    at useFonts (expo-font/build/useFonts.js:12:5)",
+        "    at RootLayout (app/_layout.tsx:36:32)",
+        "    at renderWithHooks (react-native-renderer:8342:18)",
+      ].join("\n");
+      return <FaultScreen error={error} onRetry={noop} />;
+    },
   },
 ];
 

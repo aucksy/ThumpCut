@@ -18,3 +18,4 @@ export {
 export { ExportSheet, type ExportSheetProps } from "./ExportSheet.tsx";
 export { ShareScreen, type ShareScreenProps } from "./Share.tsx";
 export { SettingsScreen, type SettingsScreenProps } from "./Settings.tsx";
+export { FaultScreen, type FaultScreenProps } from "./Fault.tsx";

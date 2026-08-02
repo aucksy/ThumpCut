@@ -14,11 +14,17 @@
     "test:app": "npm run test -w thumpcut-app",
     "verify:ui": "npm run verify -w @thumpcut/ui-verify",
     "verify:ui:screens": "npm run screens -w @thumpcut/ui-verify",
-    "verify": "npm run typecheck && npm test && npm run verify:ui",
+    "verify": "npm run check:native && npm run typecheck && npm test && npm run verify:ui",
+    "check:native": "node tools/check-native-versions.mjs",
     "icons": "node tools/icons/make-icons.mjs",
     "prebuild:android": "npm run prebuild:android -w thumpcut-app",
     "factory": "python -m factory.run",
     "factory:test": "python -m pytest factory/tests -q"
+  },
+  "//overrides": "expo-asset resolved to its SDK 57 build inside this SDK 55 app, and autolinking picked that copy to compile in. It loads the fonts and images during the first render, so the app died on launch with everything else looking perfectly healthy. `expo install --check` does not see this: it only inspects direct dependencies. `npm run check:native` does, and runs in CI.",
+  "overrides": {
+    "expo-asset": "55.0.18",
+    "expo-constants": "55.0.17"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

@@ -46,6 +46,11 @@ jobs:
         # failed React Native's code generator and took a whole cloud build with it.
         working-directory: app
         run: npx expo install --check
+      - name: Every linked native module is on this SDK
+        # Stronger than the check above, which only inspects what package.json asks for.
+        # expo-asset resolved to its SDK 57 build underneath an SDK 55 app and was the copy
+        # compiled in. It builds, it passes everything here, and then it dies on launch.
+        run: npm run check:native
       - name: Typecheck
         run: npm run typecheck
       - name: Tests
