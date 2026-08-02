@@ -12,6 +12,7 @@ export { MediaSelectScreen, type MediaSelectScreenProps } from "./MediaSelect.ts
 export { RecommendedScreen, type RecommendedScreenProps } from "./Recommended.tsx";
 export {
   PreviewScreen,
+  type PreviewAudioMode,
   type PreviewNotice,
   type PreviewScreenProps,
 } from "./Preview.tsx";

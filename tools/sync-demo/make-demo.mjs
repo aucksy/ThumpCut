@@ -158,14 +158,18 @@ const media = frames.map((frame, index) => ({
   rotationDeg: 0,
 }));
 
-const audioPath = findAudio(track.trackId);
-if (!audioPath) {
-  throw new Error(
-    `No audio found for "${track.trackId}".\n` +
-      `  Fixtures live in factory/fixtures/. Your own tracks go in factory/local/,\n` +
-      `  named to match the track id in the catalogue.`,
-  );
-}
+/**
+ * `--stream` plays the track from the published link instead of from a copy on disk — the
+ * exact chain the phone's preview uses: `audio.json` → an HTTPS link → a player whose own
+ * clock drives the cuts. It is the only way to watch that chain work without a phone, so it
+ * is worth having even though the default stays offline.
+ *
+ * The content hash is checked here for the same reason the app checks it: a link issued for a
+ * different recording than the beat grid was computed from plays perfectly and lands every
+ * cut in the wrong place.
+ */
+const stream = process.argv.includes("--stream");
+
 /**
  * `--embed` folds the audio into the page as a data URI, so the whole demo is one file that
  * can be mailed, opened from a download, or published — no folder to keep together and no
@@ -173,17 +177,53 @@ if (!audioPath) {
  * music stays on his disk.
  */
 const embed = process.argv.includes("--embed");
-const audioName = basename(audioPath);
-let audioSrc = audioName;
 
-if (embed) {
-  const mime =
-    { ".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".ogg": "audio/ogg" }[
-      extname(audioPath).toLowerCase()
-    ] ?? "application/octet-stream";
-  audioSrc = `data:${mime};base64,${readFileSync(audioPath).toString("base64")}`;
+let audioSrc;
+let audioOrigin;
+
+if (stream) {
+  const indexFile = join(CATALOGUE, "audio.json");
+  if (!existsSync(indexFile)) {
+    throw new Error(
+      `No audio index at ${indexFile}. Run: python -m factory.run --no-upload --out catalogue`,
+    );
+  }
+  const entry = JSON.parse(readFileSync(indexFile, "utf8")).audio?.[track.trackId];
+  if (!entry) {
+    throw new Error(`The audio index has no link for "${track.trackId}".`);
+  }
+  if (entry.contentHash !== track.contentHash) {
+    throw new Error(
+      `The link for "${track.trackId}" was issued for a different recording than its beat ` +
+        `grid was computed from. The app refuses this too — it would put every cut in the ` +
+        `wrong place with nothing erroring.`,
+    );
+  }
+  audioSrc = entry.url;
+  audioOrigin = `streamed from ${entry.url}`;
 } else {
-  copyFileSync(audioPath, join(OUT, audioName));
+  const audioPath = findAudio(track.trackId);
+  if (!audioPath) {
+    throw new Error(
+      `No audio found for "${track.trackId}".\n` +
+        `  Fixtures live in factory/fixtures/. Your own tracks go in factory/local/,\n` +
+        `  named to match the track id in the catalogue.\n` +
+        `  Or pass --stream to play the published link instead.`,
+    );
+  }
+  const audioName = basename(audioPath);
+  audioSrc = audioName;
+  audioOrigin = audioPath;
+
+  if (embed) {
+    const mime =
+      { ".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".ogg": "audio/ogg" }[
+        extname(audioPath).toLowerCase()
+      ] ?? "application/octet-stream";
+    audioSrc = `data:${mime};base64,${readFileSync(audioPath).toString("base64")}`;
+  } else {
+    copyFileSync(audioPath, join(OUT, audioName));
+  }
 }
 
 /** One cut list per template, so the same track can be heard cut five different ways. */
@@ -225,6 +265,7 @@ writeFileSync(join(OUT, "index.html"), page(payload), "utf8");
 console.log("ThumpCut sync demo");
 console.log(`  track      ${track.title} — ${track.artist}, ${track.bpm} BPM`);
 console.log(`  pictures   ${frames.length}${photoDir ? ` from ${photoDir}` : " (generated)"}`);
+console.log(`  audio      ${audioOrigin}`);
 for (const take of takes) {
   console.log(
     `  ${take.name.padEnd(12)} ${String(take.cuts.length).padStart(2)} cuts, ` +

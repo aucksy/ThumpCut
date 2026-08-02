@@ -250,11 +250,18 @@ export const SCREEN_STATES: ScreenState[] = [
   },
 
   // 6 · Preview
-  { id: "06-preview-default", title: "Preview — default, metronome click not the song", render: () => <PreviewScreen onBack={noop} {...previewBase} /> },
+  { id: "06-preview-default", title: "Preview — the track is playing", render: () => <PreviewScreen onBack={noop} {...previewBase} /> },
+  { id: "06-preview-connecting", title: "Preview — recording on its way, click covering it, nothing said", render: () => <PreviewScreen onBack={noop} {...previewBase} audioMode="connecting" /> },
+  { id: "06-preview-click", title: "Preview — track could not be loaded, click instead", render: () => <PreviewScreen onBack={noop} {...previewBase} audioMode="click" /> },
   { id: "06-preview-building", title: "Preview — building, dimmed, no spinner", render: () => <PreviewScreen onBack={noop} {...previewBase} building /> },
   { id: "06-preview-adjusted", title: "Preview — template adjusted", render: () => <PreviewScreen onBack={noop} {...previewBase} notice="adjusted" /> },
   { id: "06-preview-skipped", title: "Preview — item skipped", render: () => <PreviewScreen onBack={noop} {...previewBase} notice="skipped" /> },
   { id: "06-preview-retired", title: "Preview — track retired, substituted quietly", render: () => <PreviewScreen onBack={noop} {...previewBase} notice="retired" /> },
+  {
+    id: "06-preview-retired-and-click",
+    title: "Preview — the worst case: track swapped and the new one will not load",
+    render: () => <PreviewScreen onBack={noop} {...previewBase} notice="retired" audioMode="click" />,
+  },
   { id: "06-preview-reduced", title: "Preview — reduced motion", render: () => <PreviewScreen onBack={noop} {...previewBase} reducedMotion /> },
 
   // 7 · Export

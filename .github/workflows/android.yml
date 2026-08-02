@@ -85,6 +85,17 @@ jobs:
           echo "EXPO_PUBLIC_CATALOGUE_URL=$url" >> "$GITHUB_ENV"
           echo "Songs will be fetched from $url"
 
+      - name: Point the preview at the audio links
+        # Deliberately NOT pinned to the commit, and deliberately a different document from the
+        # song list. Instagram's audio links expire in about a day and a half, so a phone
+        # holding an app built last month still has to be able to get a fresh one. Nothing in
+        # here can change what songs the app offers — it is a lookup by track id, and an id the
+        # app does not know is ignored. A track with no entry plays the click instead.
+        run: |
+          url="https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@main/catalogue/audio.json"
+          echo "EXPO_PUBLIC_AUDIO_INDEX_URL=$url" >> "$GITHUB_ENV"
+          echo "Preview audio links will be fetched from $url"
+
       - name: Generate the native Android project
         run: npm run prebuild:android
 

@@ -21,6 +21,7 @@ import {
 } from "react";
 import Constants from "expo-constants";
 import { buildCutList, type CutList, type MediaItem } from "@thumpcut/cut-engine";
+import { planPreviewAudio, type PreviewAudioPlan } from "../audio/source.ts";
 import {
   CatalogueService,
   createDeviceNetwork,
@@ -53,6 +54,8 @@ export interface AppState {
   /** The single cut list the preview plays and the export renders. */
   cutList: CutList | null;
   media: MediaItem[];
+  /** Whether the preview may stream the selected track, and why not when it may not. */
+  audioPlan: PreviewAudioPlan;
   /** Shown once, then cleared. */
   notice: "none" | "adjusted" | "skipped" | "retired";
 
@@ -65,13 +68,22 @@ export interface AppState {
 
 const AppContext = createContext<AppState | null>(null);
 
-const CATALOGUE_URL =
-  (Constants.expoConfig?.extra as { catalogueUrl?: string } | undefined)?.catalogueUrl ?? "";
+const EXTRA = Constants.expoConfig?.extra as
+  | { catalogueUrl?: string; audioIndexUrl?: string }
+  | undefined;
+const CATALOGUE_URL = EXTRA?.catalogueUrl ?? "";
+/**
+ * Deliberately a different URL from the catalogue's, and deliberately not pinned to the build
+ * commit. Instagram's audio links expire in about a day and a half; the song list must not
+ * move after a build. See `AudioIndex` in the catalogue types.
+ */
+const AUDIO_INDEX_URL = EXTRA?.audioIndexUrl ?? "";
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const service = useRef(
     new CatalogueService({
       catalogueUrl: CATALOGUE_URL,
+      audioIndexUrl: AUDIO_INDEX_URL,
       storage: createDeviceStorage(),
       network: createDeviceNetwork(),
     }),
@@ -83,6 +95,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [selectedTrack, setSelectedTrack] = useState<CatalogueTrack | null>(null);
   const [beatMap, setBeatMap] = useState<BeatMap | null>(null);
   const [cutList, setCutList] = useState<CutList | null>(null);
+  const [audioPlan, setAudioPlan] = useState<PreviewAudioPlan>({
+    kind: "click",
+    reason: "no-entry",
+  });
   const [notice, setNotice] = useState<AppState["notice"]>("none");
   const [shuffleSeed, setShuffleSeed] = useState(0);
 
@@ -123,9 +139,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // On a cold start the index may not have landed yet. Fetching it here rather than
+      // racing it means the preview knows whether it may stream *before* it starts playing,
+      // instead of beginning on the click and switching a beat later for no reason.
+      if (!service.audioIndex()) await service.refreshAudioIndex();
+      if (token !== buildToken.current) return;
+
       setBeatMap(map);
       setSelectedTrack(track);
       setSelectedTemplate(template);
+      setAudioPlan(planPreviewAudio(service.audioIndex(), track, Date.now()));
       setCutList(buildCutList(map, items, template));
     },
     [catalogue.catalogue, service],
@@ -156,6 +179,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       beatMap,
       cutList,
       media,
+      audioPlan,
       notice,
       loadCatalogue,
       retryCatalogue,
@@ -164,6 +188,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       clearNotice: () => setNotice("none"),
     }),
     [
+      audioPlan,
       beatMap,
       catalogue,
       chooseTemplate,

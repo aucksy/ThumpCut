@@ -35,6 +35,33 @@ export interface Catalogue {
   templates: CatalogueTemplate[];
 }
 
+/**
+ * Where the preview gets the actual recording.
+ *
+ * This is deliberately *not* part of `catalogue.json`. The song list is pinned to the commit
+ * the app was built from, so nothing inside it can ever change for a phone that already has
+ * the app. Instagram's audio links expire in about a day and a half, so they have to be able
+ * to move. Keeping them in their own document, fetched unpinned, is what lets a link be
+ * refreshed without a phone ever being handed a song list newer than its app.
+ *
+ * Everything here is looked up by track id. An entry for a track the app has never heard of
+ * is ignored; a track with no entry falls back to the click. Neither can break anything.
+ */
+export interface AudioIndexEntry {
+  /** Fetched as-is. Only HTTPS is ever played. */
+  url: string;
+  /** ISO 8601, or null when the link does not expire (our own test tracks). */
+  expiresAt: string | null;
+  /** The beat map hash of the recording this link was issued for. */
+  contentHash: string;
+}
+
+export interface AudioIndex {
+  schemaVersion: number;
+  generatedAt: string;
+  audio: Record<string, AudioIndexEntry>;
+}
+
 export type CatalogueState =
   | "NoCache"
   | "Downloading"
@@ -68,9 +95,20 @@ export interface HttpResponse {
   body: string;
 }
 
+export interface FetchOptions {
+  /**
+   * Ask for a fresh copy rather than whatever the phone has cached.
+   *
+   * The CDN tells clients a file is good for a week. That is right for the song list, which
+   * is pinned to a commit and can never change, and wrong for the audio index, whose whole
+   * job is to carry a link that expires in a day and a half.
+   */
+  noCache?: boolean;
+}
+
 export interface CatalogueNetwork {
   /** Rejects on a transport failure; resolves with any HTTP status. */
-  get(url: string, timeoutMs: number): Promise<HttpResponse>;
+  get(url: string, timeoutMs: number, options?: FetchOptions): Promise<HttpResponse>;
   isOnline(): Promise<boolean>;
 }
 

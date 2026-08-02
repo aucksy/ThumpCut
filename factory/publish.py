@@ -22,20 +22,24 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from factory.config import (
+    AUDIO_INDEX_FILENAME,
+    AUDIO_LINK_ASSUMED_TTL_HOURS,
     BEATMAP_DIRNAME,
     CATALOGUE_FILENAME,
     FETCH_TIMEOUT_SECONDS,
+    FIXTURE_AUDIO_BASE_URL,
     OUT_DIR,
     Credentials,
 )
 from factory.schema import BeatMap, validate_publishable
 
 CATALOGUE_SCHEMA_VERSION = 1
+AUDIO_INDEX_SCHEMA_VERSION = 1
 _STAGING_DIRNAME = ".staging"
 _R2_REGION = "auto"
 _R2_SERVICE = "s3"
@@ -120,6 +124,114 @@ def _hash_payload(payload: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+# ---------------------------------------------------------------------------
+# The audio index — where the app's preview may fetch each recording.
+# ---------------------------------------------------------------------------
+
+
+def parse_url_expiry(url: str) -> datetime | None:
+    """
+    Read a signed URL's own expiry, if it carries one.
+
+    Instagram's CDN links end with ``&oe=HEXSECONDS`` — the Unix time the signature stops
+    being accepted. Reading it is worth the twenty lines: it is the real answer, and the
+    alternative is a guess that is wrong in one direction or the other every single time.
+
+    Returns None when there is nothing readable, so the caller can fall back to its own
+    assumed lifetime rather than treating an unreadable link as immortal.
+    """
+    query = urllib.parse.urlsplit(url).query
+    for key, values in urllib.parse.parse_qs(query).items():
+        if key.lower() != "oe":
+            continue
+        for value in values:
+            try:
+                seconds = int(value, 16)
+            except ValueError:
+                continue
+            # Reject anything absurd — a mis-parsed field is worse than no field at all.
+            if 1_000_000_000 < seconds < 4_000_000_000:
+                return datetime.fromtimestamp(seconds, tz=timezone.utc)
+    return None
+
+
+def audio_link_for(
+    download_url: str,
+    now: datetime,
+    fixture_base_url: str = FIXTURE_AUDIO_BASE_URL,
+) -> tuple[str, str | None] | None:
+    """
+    Turn one track's audio source into (url, expiresAt) for the app, or None to publish nothing.
+
+    Three cases, and the third is the one that matters:
+
+    * ``fixture://`` — our own synthesised test tracks, which live in this repository. Served
+      straight from it, and they never expire.
+    * ``local://`` — the owner's own music. **Never published.** The file is not in the
+      repository and a phone has no route to it; publishing a link to it would be publishing a
+      404 at best. Same reasoning as invariant P8.
+    * an HTTPS link from Meta — passed through untouched, with its own expiry when it declares
+      one. Nothing is copied, re-hosted or proxied; the phone streams from the same CDN
+      Instagram itself does.
+    """
+    if download_url.startswith("local://"):
+        return None
+
+    if download_url.startswith("fixture://"):
+        name = download_url[len("fixture://") :].strip("/")
+        if not name:
+            return None
+        return f"{fixture_base_url.rstrip('/')}/{name}", None
+
+    if not download_url.startswith("https://"):
+        return None
+
+    declared = parse_url_expiry(download_url)
+    if declared is None or declared <= now:
+        declared = now + timedelta(hours=AUDIO_LINK_ASSUMED_TTL_HOURS)
+    return download_url, declared.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def build_audio_index(
+    beat_maps: list[BeatMap],
+    audio_sources: dict[str, str],
+    now: datetime | None = None,
+    fixture_base_url: str = FIXTURE_AUDIO_BASE_URL,
+) -> dict[str, Any]:
+    """
+    Assemble ``audio.json``: track id → where the preview may stream that recording.
+
+    ``contentHash`` is copied from the beat map, not recomputed. That is the whole safety
+    property: the app refuses to play a link whose hash does not match the beat grid it is
+    about to cut against, so a recording swapped between two Factory runs produces a click
+    rather than a reel whose cuts are all quietly in the wrong place.
+    """
+    stamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+
+    audio: dict[str, Any] = {}
+    for beat_map in sorted(beat_maps, key=lambda b: b.trackId):
+        source = audio_sources.get(beat_map.trackId)
+        if not source:
+            continue
+        link = audio_link_for(source, stamp, fixture_base_url)
+        if link is None:
+            continue
+        url, expires_at = link
+        audio[beat_map.trackId] = {
+            "url": url,
+            "expiresAt": expires_at,
+            "contentHash": beat_map.contentHash,
+        }
+
+    index: dict[str, Any] = {
+        "schemaVersion": AUDIO_INDEX_SCHEMA_VERSION,
+        "generatedAt": stamp.isoformat().replace("+00:00", "Z"),
+        "audio": audio,
+    }
+    index["indexHash"] = _hash_payload({"audio": audio})
+    return index
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -131,11 +243,42 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
         raise PublishFailed(f"could not write {path}: {exc}") from exc
 
 
+def _carry_over_generated_at(
+    payload: dict[str, Any],
+    live_file: Path,
+    hash_key: str,
+) -> dict[str, Any]:
+    """
+    Keep the previous timestamp when the content is byte-for-byte the same.
+
+    ``generatedAt`` means "when this content was produced", not "when the job last ran". The
+    Factory is on a timer so that Instagram's audio links stay fresh, and without this every
+    run would rewrite the timestamp, which reads as a change, which commits, which republishes
+    — a repository full of commits that changed nothing.
+    """
+    if not live_file.is_file():
+        return payload
+    try:
+        previous = json.loads(live_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return payload
+    if not isinstance(previous, dict):
+        return payload
+    if previous.get(hash_key) != payload.get(hash_key):
+        return payload
+    carried = previous.get("generatedAt")
+    if isinstance(carried, str) and carried:
+        payload = dict(payload)
+        payload["generatedAt"] = carried
+    return payload
+
+
 def write_local(
     beat_maps: list[BeatMap],
     templates: list[dict[str, Any]],
     out_dir: Path | None = None,
     now: datetime | None = None,
+    audio_sources: dict[str, str] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     """Write the catalogue and every beat map atomically. Returns (out_dir, catalogue)."""
     if not beat_maps:
@@ -155,7 +298,16 @@ def write_local(
             _write_json(staging / BEATMAP_DIRNAME / f"{beat_map.trackId}.json", beat_map.to_json())
 
         catalogue = build_catalogue(beat_maps, templates, now)
+        catalogue = _carry_over_generated_at(
+            catalogue, destination / CATALOGUE_FILENAME, "catalogueHash"
+        )
         _write_json(staging / CATALOGUE_FILENAME, catalogue)
+
+        audio_index = build_audio_index(beat_maps, audio_sources or {}, now)
+        audio_index = _carry_over_generated_at(
+            audio_index, destination / AUDIO_INDEX_FILENAME, "indexHash"
+        )
+        _write_json(staging / AUDIO_INDEX_FILENAME, audio_index)
 
         # K-I5 mirrored on the publish side: every track listed has a file next to it.
         for track in catalogue["tracks"]:
@@ -185,6 +337,9 @@ def _swap_into_place(staging: Path, destination: Path) -> None:
             live_beatmaps.rename(previous)
         staged_beatmaps.rename(live_beatmaps)
         shutil.copyfile(staging / CATALOGUE_FILENAME, destination / CATALOGUE_FILENAME)
+        staged_audio = staging / AUDIO_INDEX_FILENAME
+        if staged_audio.is_file():
+            shutil.copyfile(staged_audio, destination / AUDIO_INDEX_FILENAME)
     except OSError as exc:
         # Put the old beat maps back so the previous catalogue keeps working.
         if previous.exists() and not live_beatmaps.exists():
@@ -285,6 +440,8 @@ def upload_to_r2(
     ordered: list[tuple[str, Path]] = [
         (f"{BEATMAP_DIRNAME}/{path.name}", path) for path in beat_map_files
     ]
+    if (out_dir / AUDIO_INDEX_FILENAME).is_file():
+        ordered.append((AUDIO_INDEX_FILENAME, out_dir / AUDIO_INDEX_FILENAME))
     ordered.append((CATALOGUE_FILENAME, out_dir / CATALOGUE_FILENAME))
 
     uploaded: list[str] = []

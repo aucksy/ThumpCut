@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { StyleSheet, View, type TextStyle, type ViewStyle } from "react-native";
 import { alpha, colors, fontFamily, radius, shadow, space } from "@thumpcut/design-tokens";
 import { Body } from "./text.tsx";
-import { SwapGlyph } from "./icons.tsx";
+import { SwapGlyph, WarningGlyph } from "./icons.tsx";
 
 /** A transient message near the bottom of the screen. */
 export function Toast({ children, style }: { children: ReactNode; style?: ViewStyle }) {
@@ -46,13 +46,36 @@ export function InlineHint({
 }
 
 /**
- * The quiet treatment for a track that was swapped. The user's work is not lost, and the tone
- * has to say so — this is a notice, not an error.
+ * The quiet treatment for something that happened to the track — it was swapped, or its
+ * recording would not load. The user's work is not lost, and the tone has to say so: this is a
+ * notice, not an error.
+ *
+ * `swap` for a substitution, `warn` for something that could not be done. Nothing else is
+ * offered, because a notice with a third meaning would be an error message in disguise.
  */
-export function TrackNotice({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+export function TrackNotice({
+  children,
+  glyph = "swap",
+  style,
+  testID,
+}: {
+  children: ReactNode;
+  glyph?: "swap" | "warn";
+  style?: ViewStyle;
+  testID?: string;
+}) {
   return (
-    <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.notice, style]}>
-      <SwapGlyph style={styles.noticeIcon} />
+    <View
+      testID={testID}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={[styles.notice, style]}
+    >
+      {glyph === "warn" ? (
+        <WarningGlyph size={14} style={styles.noticeIcon} />
+      ) : (
+        <SwapGlyph style={styles.noticeIcon} />
+      )}
       <Body style={styles.noticeText}>{children}</Body>
     </View>
   );

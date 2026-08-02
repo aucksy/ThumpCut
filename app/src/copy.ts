@@ -101,6 +101,8 @@ export const COPY = {
     previewFailed: "We couldn't build a preview. Try a different style.",
     /** PV6 */
     trackRetired: "That track isn't available anymore. Here's a similar one.",
+    /** PV7 — the recording could not be streamed, so the click is carrying the preview. */
+    audioUnavailable: "We couldn't load the track, so you'll hear a click on each beat.",
   },
 
   // --- Export (spec 06 §6) ----------------------------------------------------------------------

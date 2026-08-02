@@ -8,13 +8,21 @@ from pathlib import Path
 
 import pytest
 
-from factory.config import BEATMAP_DIRNAME, CATALOGUE_FILENAME, Credentials
+from factory.config import (
+    AUDIO_INDEX_FILENAME,
+    BEATMAP_DIRNAME,
+    CATALOGUE_FILENAME,
+    Credentials,
+)
 from factory.discover import DiscoveredTrack
 from factory.publish import (
     PublishFailed,
+    audio_link_for,
+    build_audio_index,
     build_catalogue,
     build_signed_put,
     load_templates,
+    parse_url_expiry,
     upload_to_r2,
     write_local,
 )
@@ -244,7 +252,9 @@ def test_the_catalogue_is_uploaded_last(tmp_path: Path, r2_credentials: Credenti
 
     upload_to_r2(r2_credentials, tmp_path, record, MOMENT)
     assert order[-1] == CATALOGUE_FILENAME
-    assert set(order[:-1]) == {"a.json", "b.json"}
+    # The audio index goes up with the beat maps: it is looked up by track id, so an entry
+    # landing before the catalogue that names it cannot be reached by anything.
+    assert set(order[:-1]) == {"a.json", "b.json", AUDIO_INDEX_FILENAME}
 
 
 def test_a_failed_upload_aborts_the_publish(tmp_path: Path, r2_credentials: Credentials) -> None:
@@ -260,3 +270,103 @@ def test_a_failed_upload_aborts_the_publish(tmp_path: Path, r2_credentials: Cred
 def test_uploading_without_credentials_is_refused(tmp_path: Path, no_credentials: Credentials) -> None:
     with pytest.raises(PublishFailed, match="R2 credentials"):
         upload_to_r2(no_credentials, tmp_path, lambda *args: 200, MOMENT)
+
+
+# ---------------------------------------------------------------------------
+# The audio index — where the app's preview may stream each recording.
+# ---------------------------------------------------------------------------
+
+
+def test_a_meta_link_is_passed_through_with_its_own_expiry() -> None:
+    """Instagram signs its URLs with the moment they die. That beats any guess we could make."""
+    # 0x6A8227A0 is 2026-08-16T21:12:00Z.
+    url = "https://scontent.example/audio.m4a?oh=abc&oe=6A8227A0"
+    passed_through, expires_at = audio_link_for(url, MOMENT)
+    assert passed_through == url  # nothing copied, nothing rewritten, nothing proxied
+    assert expires_at == "2026-08-16T21:12:00Z"
+
+
+def test_a_link_with_no_readable_expiry_gets_an_assumed_one() -> None:
+    _, expires_at = audio_link_for("https://scontent.example/audio.m4a", MOMENT)
+    assert expires_at == "2026-08-02T18:00:00Z"  # MOMENT + 30 hours
+
+
+def test_an_already_dead_declared_expiry_is_not_published_as_dead() -> None:
+    """A clock skew between Meta and us must not publish a link the app will refuse on sight."""
+    _, expires_at = audio_link_for("https://x.example/a.m4a?oe=60000000", MOMENT)
+    assert expires_at == "2026-08-02T18:00:00Z"
+
+
+def test_nonsense_expiry_fields_are_ignored() -> None:
+    assert parse_url_expiry("https://x.example/a?oe=zzzz") is None
+    assert parse_url_expiry("https://x.example/a?oe=1") is None  # far too early to be real
+    assert parse_url_expiry("https://x.example/a") is None
+
+
+def test_a_fixture_track_gets_a_permanent_link() -> None:
+    url, expires_at = audio_link_for("fixture://chill-96.wav", MOMENT)
+    assert url.endswith("/factory/fixtures/chill-96.wav")
+    assert expires_at is None  # our own recording; it is not going anywhere
+
+
+def test_the_owners_own_music_is_never_published() -> None:
+    """P8's reasoning, applied to the index: the file is not in the repository and never will be."""
+    assert audio_link_for("local://Artist - Song.mp3", MOMENT) is None
+
+
+def test_http_and_other_schemes_are_never_published() -> None:
+    assert audio_link_for("http://insecure.example/a.m4a", MOMENT) is None
+    assert audio_link_for("ftp://old.example/a.m4a", MOMENT) is None
+
+
+def test_the_index_carries_the_beat_maps_content_hash() -> None:
+    """V8: the app refuses a link whose hash does not match the grid it is about to cut to."""
+    beat_map = beat_map_for("a")
+    index = build_audio_index(
+        [beat_map], {"a": "https://scontent.example/a.m4a"}, MOMENT
+    )
+    assert index["audio"]["a"]["contentHash"] == beat_map.contentHash
+
+
+def test_a_track_with_no_audio_source_is_simply_absent() -> None:
+    index = build_audio_index([beat_map_for("a"), beat_map_for("b")], {"a": "fixture://x.wav"}, MOMENT)
+    assert set(index["audio"]) == {"a"}
+
+
+def test_write_local_publishes_the_index_beside_the_catalogue(tmp_path: Path) -> None:
+    write_local(
+        [beat_map_for("a")],
+        load_templates(),
+        tmp_path,
+        MOMENT,
+        audio_sources={"a": "fixture://chill-96.wav"},
+    )
+    payload = json.loads((tmp_path / AUDIO_INDEX_FILENAME).read_text(encoding="utf-8"))
+    assert payload["schemaVersion"] == 1
+    assert payload["audio"]["a"]["expiresAt"] is None
+
+
+def test_an_unchanged_run_does_not_move_the_timestamps(tmp_path: Path) -> None:
+    """
+    The Factory is on a timer so audio links stay fresh. Without this, every run would rewrite
+    `generatedAt`, which reads as a change, which commits — a repository full of empty commits.
+    """
+    later = datetime(2026, 8, 3, 12, 0, 0, tzinfo=timezone.utc)
+    sources = {"a": "fixture://chill-96.wav"}
+    write_local([beat_map_for("a")], load_templates(), tmp_path, MOMENT, audio_sources=sources)
+    first_catalogue = (tmp_path / CATALOGUE_FILENAME).read_bytes()
+    first_index = (tmp_path / AUDIO_INDEX_FILENAME).read_bytes()
+
+    write_local([beat_map_for("a")], load_templates(), tmp_path, later, audio_sources=sources)
+    assert (tmp_path / CATALOGUE_FILENAME).read_bytes() == first_catalogue
+    assert (tmp_path / AUDIO_INDEX_FILENAME).read_bytes() == first_index
+
+
+def test_a_changed_run_does_move_the_timestamp(tmp_path: Path) -> None:
+    later = datetime(2026, 8, 3, 12, 0, 0, tzinfo=timezone.utc)
+    write_local([beat_map_for("a")], load_templates(), tmp_path, MOMENT,
+                audio_sources={"a": "fixture://chill-96.wav"})
+    write_local([beat_map_for("a")], load_templates(), tmp_path, later,
+                audio_sources={"a": "fixture://drive-124.wav"})
+    payload = json.loads((tmp_path / AUDIO_INDEX_FILENAME).read_text(encoding="utf-8"))
+    assert payload["generatedAt"] == "2026-08-03T12:00:00Z"

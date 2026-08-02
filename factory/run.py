@@ -10,6 +10,7 @@ Every log line in spec 01 §7 is produced here, word for word.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -19,6 +20,7 @@ from factory.analyse import AnalysisFailed, analyse
 from factory.audio_io import AudioDecodeError, load_audio
 from factory.config import (
     ANALYSIS_SAMPLE_RATE,
+    AUDIO_INDEX_FILENAME,
     OUT_DIR,
     TMP_DIR,
     Credentials,
@@ -68,6 +70,8 @@ class RunReport:
     changed: list[str] = field(default_factory=list)
     retired: list[str] = field(default_factory=list)
     failures: list[tuple[str, str]] = field(default_factory=list)
+    # How many published tracks the app's preview can actually stream.
+    playable: int = 0
     aborted: bool = False
     abort_reason: str = ""
 
@@ -111,6 +115,18 @@ def _analyse_track(
     finally:
         # P1 — the audio goes as soon as we are finished with it, success or failure.
         audio_path.unlink(missing_ok=True)
+
+
+def _count_playable_links(destination: Path) -> int:
+    """How many tracks came out with a link the preview can stream. Never raises."""
+    try:
+        payload = json.loads(
+            (destination / AUDIO_INDEX_FILENAME).read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        return 0
+    audio = payload.get("audio")
+    return len(audio) if isinstance(audio, dict) else 0
 
 
 def _fingerprint_track(track: DiscoveredTrack, tmp_dir: Path) -> str:
@@ -251,9 +267,17 @@ def run_factory(
         _log("WARNING: no usable tracks this run. Keeping the previous catalogue.")
         return report
 
+    # Where the app's preview may stream each recording. Taken from this run's discovery, so a
+    # track whose beat map was reused still gets today's link rather than a stale one.
+    audio_sources = {
+        track.audio_id: track.download_url for track in discovered if track.download_url
+    }
+
     try:
         templates = load_templates()
-        _, catalogue = write_local(ready, templates, destination, moment)
+        _, catalogue = write_local(
+            ready, templates, destination, moment, audio_sources=audio_sources
+        )
     except DiskFull as exc:
         _log(str(exc))
         report.aborted = True
@@ -266,6 +290,13 @@ def run_factory(
         return report
 
     report.published = [track["trackId"] for track in catalogue["tracks"]]
+
+    # Said out loud because the alternative is a preview that clicks and nobody knowing why.
+    report.playable = _count_playable_links(destination)
+    _log(
+        f"AUDIO_LINKS {report.playable} of {len(report.published)} tracks can be streamed in "
+        f"the preview. The rest fall back to the click."
+    )
 
     if creds.has_r2 and not skip_upload:
         try:

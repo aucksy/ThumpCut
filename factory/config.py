@@ -23,6 +23,24 @@ LOCAL_DIR = FACTORY_DIR / "local"
 
 CATALOGUE_FILENAME = "catalogue.json"
 BEATMAP_DIRNAME = "beatmaps"
+# Where the preview gets each track's recording from. A separate document from the catalogue
+# on purpose: the song list is pinned to the commit an app was built from and must not move,
+# and Instagram's audio links expire in about a day and a half, so they must. See spec 05 §1.1.
+AUDIO_INDEX_FILENAME = "audio.json"
+
+# How long a Meta download_url is assumed to last when the link itself does not say. Meta's
+# signed URLs usually carry their own expiry in an `oe=` parameter, which is preferred over
+# this whenever it can be read. Deliberately shorter than the ~1.5 days observed: a link
+# treated as dead an hour early costs a click track, one treated as alive an hour late costs
+# a preview that plays nothing.
+AUDIO_LINK_ASSUMED_TTL_HOURS = 30
+
+# The test tracks are synthesised by this project and live in the repository, so they are
+# served straight from it and never expire. Overridable for a fork or a different host.
+FIXTURE_AUDIO_BASE_URL = (
+    os.environ.get("FIXTURE_AUDIO_BASE_URL")
+    or "https://cdn.jsdelivr.net/gh/aucksy/ThumpCut@main/factory/fixtures"
+)
 
 # Sanity thresholds — spec 01 §5 and §7.
 MIN_TRACK_SECONDS = 10.0

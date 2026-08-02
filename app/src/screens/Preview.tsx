@@ -1,17 +1,16 @@
 /**
  * Preview.
  *
- * The important thing about this screen: **it plays a metronome click, not the song.** A click
- * on every beat, a stronger one on every downbeat, generated on the device. The user hears the
- * *timing*, not the music.
+ * The important thing about this screen: **it plays the actual track**, and the picture changes
+ * on its beats. That is the whole product, seen and heard in one place.
  *
- * That is a legal constraint, and the design has to carry it gracefully rather than apologise
- * for it. The beat ruler and the amber on-beat pulse do the work of saying "this is locked to
- * the music", so both are given real presence. The track name and tempo are still shown,
- * because that is the track they will apply in Instagram.
+ * When the recording cannot be fetched — offline, expired link, withdrawn track — the click
+ * takes over and the screen says so, once. It never quietly substitutes a click for the song
+ * and hopes nobody notices: the small label bottom-right appears only in that case, and the
+ * notice under the ruler explains it in words.
  *
- * If the phone is on silent: nothing is said about it. The click is a nicety, not a
- * dependency.
+ * If the phone is on silent: nothing is said about it. That is the user's own doing, and the
+ * ruler and the picture carry the preview on their own.
  */
 
 import { Image } from "expo-image";
@@ -26,6 +25,7 @@ import {
   space,
 } from "@thumpcut/design-tokens";
 import { COPY } from "../copy.ts";
+import type { PreviewAudioMode } from "../audio/PreviewAudio.ts";
 import type { CatalogueTemplate } from "../catalogue/types.ts";
 import type { RulerMarker } from "../ui/BeatRuler.tsx";
 import { BeatRuler } from "../ui/BeatRuler.tsx";
@@ -36,6 +36,8 @@ import { Label, Mono } from "../ui/text.tsx";
 import { TemplateStrip } from "../ui/TemplateStrip.tsx";
 
 export type PreviewNotice = "none" | "adjusted" | "skipped" | "retired";
+
+export type { PreviewAudioMode };
 
 export interface PreviewScreenProps {
   templateName: string;
@@ -54,6 +56,7 @@ export interface PreviewScreenProps {
   building?: boolean;
   reducedMotion?: boolean;
   notice?: PreviewNotice;
+  audioMode?: PreviewAudioMode;
   templates: CatalogueTemplate[];
   selectedTemplateId: string;
   onBack?: () => void;
@@ -78,6 +81,7 @@ export function PreviewScreen({
   building = false,
   reducedMotion = false,
   notice = "none",
+  audioMode = "streaming",
   templates,
   selectedTemplateId,
   onBack,
@@ -146,14 +150,26 @@ export function PreviewScreen({
             {trackTitle} · {trackArtist} · {trackTempo}
           </Mono>
         </View>
-        <Label numberOfLines={1} style={styles.clickLabel}>
-          {COPY.preview.clickPreview}
-        </Label>
+        {/* Only when the song is not what you are hearing. When it is, nothing needs saying. */}
+        {audioMode === "click" ? (
+          <Label numberOfLines={1} style={styles.clickLabel} testID="preview-click-label">
+            {COPY.preview.clickPreview}
+          </Label>
+        ) : null}
       </View>
 
-      {notice === "retired" ? (
+      {notice === "retired" || audioMode === "click" ? (
         <View style={styles.noticeRow}>
-          <TrackNotice>{COPY.preview.trackRetired}</TrackNotice>
+          {notice === "retired" ? <TrackNotice>{COPY.preview.trackRetired}</TrackNotice> : null}
+          {audioMode === "click" ? (
+            <TrackNotice
+              glyph="warn"
+              testID="preview-audio-notice"
+              style={notice === "retired" ? styles.secondNotice : undefined}
+            >
+              {COPY.preview.audioUnavailable}
+            </TrackNotice>
+          ) : null}
         </View>
       ) : null}
 
@@ -223,6 +239,7 @@ const styles = StyleSheet.create({
   beatDotOn: { opacity: 1, transform: [{ scale: 1.35 }] },
   clickLabel: { fontSize: 9 },
   noticeRow: { marginTop: space.s3, marginHorizontal: layout.screenPad },
+  secondNotice: { marginTop: space.s2 },
   // A fixed height, not a flexible one: on a short screen the strip was being squeezed to
   // zero, which made five buttons unhittable without anything looking wrong.
   strip: { flexGrow: 0, flexShrink: 0, height: 140, marginTop: space.s4 },

@@ -30,14 +30,30 @@ Instagram's fault rather than a missing setting. Save to gallery works regardles
 manifest entries the handoff needs — a FileProvider and a `<queries>` entry naming Instagram —
 are in place and were missing entirely before.
 
-## Q — May we proxy Meta's audio download_url for in-app preview playback?
+## Q — Will Meta object to the app streaming their audio link in a preview?
 **Phase:** 5
-**Blocking:** no
-**What I need:** A written answer on whether Meta's platform terms permit streaming their
-audio through our own backend for preview playback in the app.
-**What I did meanwhile:** Built Mode A per spec 05 §1.1 — a metronome click generated on
-device from the beat map. No audio is fetched. The `PreviewAudio` interface means Mode B can
-be added later without touching the UI.
+**Blocking:** no — the owner has decided this ships regardless. Flagged so it is not a surprise.
+**What I need:** Nothing to proceed. If a written answer ever becomes available it would only
+confirm or deny what is reasoned below.
+**Where it stands:** The question that was open — *may we proxy their audio through a backend
+of ours* — is now moot, because we do not. There is no backend and nothing of theirs is copied,
+stored or re-served. The app is handed a plain HTTPS link and streams it from the same CDN
+Instagram serves it from, which is what any browser does when a Reel plays. The app holds no
+Instagram token and makes no Meta API call.
+
+The reasoning that this is the intended use of that field: the `ig_audio` endpoint returns, by
+Meta's own description, audio authorised for third-party publishing, and `download_url` is
+there so a developer can let a user hear a track before attaching it. Playing it in a preview
+is the purpose it exists for.
+
+**The exposure, plainly.** Their platform terms are not a licence to a recording, and a link
+being publicly fetchable is not permission to build a product around fetching it. The realistic
+worst case is that Meta stops returning `download_url`, or the links stop resolving from
+outside their apps. That is a switch they own and can throw at any time without telling anyone.
+If they do, every preview falls back to the click and says so on screen — the product still
+works, it just stops playing music. Nothing else in ThumpCut depends on it. This is the same
+reason the exported file stays silent for ever: that one is a real legal exposure and is not
+up for revision.
 
 ## Q — Do we run the Factory against real Instagram audio, or ship the test tracks?
 **Phase:** 1 and 3

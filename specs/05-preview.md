@@ -15,7 +15,7 @@ beat ruler, template switching, shuffle.
 
 **Out of scope:** export (Phase 6), reordering media (Phase 4), editing the beat grid.
 
-### 1.1 Preview audio — SUPERSEDED 2026-08-02: BUILD MODE B
+### 1.1 Preview audio — MODE B, BUILT 2026-08-02
 
 > **Owner decision, 2026-08-02. This overrides everything below it.**
 >
@@ -31,6 +31,42 @@ beat ruler, template switching, shuffle.
 > Mode A stays in the codebase as the fallback for when audio cannot be fetched — a device
 > offline, a URL expired, a track withdrawn. It is what the user gets *instead* of silence,
 > never what they get by default.
+
+#### How Mode B was built
+
+**No proxy and no backend.** The app is handed a plain HTTPS link and streams it, exactly as
+a browser would. It holds no Instagram token, makes no Meta API call, and never copies a
+recording anywhere. Nothing about invariant P1 changes: the Factory still deletes every byte
+of audio it downloads.
+
+**The links live in their own document, `audio.json`, published beside the catalogue.** The
+song list is pinned to the commit the app was built from, so nothing inside it can move after
+a build; Instagram's links expire in about a day and a half, so they must. Keeping them apart
+is what lets a link be refreshed without a phone ever being handed a song list newer than its
+app. Its schema:
+
+```json
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-02T15:00:00Z",
+  "audio": {
+    "<trackId>": { "url": "https://…", "expiresAt": "2026-08-04T03:00:00Z", "contentHash": "…" }
+  }
+}
+```
+
+`expiresAt` is `null` for a link that does not expire. `contentHash` is the beat map hash of
+the recording the link was issued for: **if it does not match the catalogue's hash for that
+track, the recording was swapped and the link is not played** — the beat grid would be against
+a different cut of the song, every cut would land slightly wrong, and nothing would error.
+
+**The click covers the wait, then hands over.** Streaming takes a moment. The click starts
+immediately, and the moment the recording is ready the music takes over from wherever the
+click had reached — no jump, no restart, no silent ruler. If the recording never arrives the
+click carries the preview and the screen says why (PV7).
+
+**Playback position comes from the player, not from a clock.** The ruler, the on-beat dot and
+the picture all follow it, so audio and picture cannot drift apart while a stream stalls.
 
 **Original text, kept for the reasoning only:**
 
@@ -85,7 +121,9 @@ interface.
 | State | What the user sees |
 |---|---|
 | `Building` | Cut list being computed — under 100ms, so usually invisible |
-| `PreviewReady` | Video playing on loop, beat ruler live |
+| `Connecting` | The recording is on its way; the click is playing meanwhile. Nothing is said |
+| `PreviewReady` | Video playing on loop, **the track playing**, beat ruler live |
+| `ClickFallback` | The recording could not be fetched — click on every beat, PV7 shown |
 | `Muted` | Device is on silent — video and ruler still work, no note shown |
 | `TemplateIncompatible` | The chosen template cannot fit this item count — fallback applied |
 | `TrackRetired` | The chosen track left Instagram's library during this session |
@@ -96,7 +134,10 @@ interface.
 | GalleryReady | tap Create | — | (Phase 4) | open media selection |
 | (Phase 4) | media confirmed | — | Recommending | filter by item count |
 | Recommending | tap template | — | Building | call `buildCutList` |
-| Building | cut list returned | ok | PreviewReady | start playback |
+| Building | cut list returned | audio link usable | Connecting | start the click, start streaming |
+| Building | cut list returned | no usable audio link | ClickFallback | start the click, show PV7 |
+| Connecting | recording ready | — | PreviewReady | click stops, music starts at the same position |
+| Connecting | recording did not arrive | — | ClickFallback | keep the click, show PV7 |
 | Building | `TemplateIncompatibleError` | — | TemplateIncompatible | apply fallback template, notify once |
 | Building | `InsufficientMediaError` | — | (Phase 4) | return to selection with hint E9 |
 | PreviewReady | tap another template | — | Building | rebuild, keep playhead position |
@@ -126,8 +167,14 @@ interface.
   immediately with no loading indicator.
 - Given the preview is playing, When I look at the beat ruler, Then a marker sits at every cut,
   markers for video clips are visually distinct from photos, and the playhead moves in time.
-- Given the preview is playing, When I listen, Then I hear a click on every beat and a stronger
-  click on every downbeat, in time with the cuts.
+- Given the preview is playing and the recording is available, When I listen, Then I hear **the
+  track itself**, and the picture changes on its beats.
+- Given the recording is still arriving, When the preview starts, Then I hear the click rather
+  than silence, and the music takes over at the same position without restarting.
+- Given the recording cannot be fetched at all, When the preview plays, Then I hear a click on
+  every beat and a stronger click on every downbeat, and the screen tells me why once.
+- Given the catalogue's link points at a different recording than the beat grid was computed
+  from, When the preview plays, Then the track is not played and the click is used instead.
 - Given the device is muted or silent mode is on, When the preview plays, Then the video still
   plays normally and the beat ruler still animates.
 - Given I background the app during preview, When I return, Then playback resumes without a
@@ -159,7 +206,10 @@ interface.
 | B — process death | Restore selection and template; rebuild the cut list |
 | D — a selected item became unavailable since Phase 4 | Skip it, rebuild, show E4 once |
 | D — out of memory building the preview | Reduce preview resolution, retry once, then fall back to a still-frame preview |
-| F — offline | Preview works fully — the click is generated on device, nothing is fetched |
+| F — offline | The cut list, ruler and click all work with nothing fetched. The track cannot stream, so the click carries it and PV7 is shown |
+| F — audio link expired | Click, PV7. A newer `audio.json` carries a fresh link and the next preview streams |
+| F — stream stalls mid-playback | Position comes from the player, so the ruler and picture stall with it rather than drifting ahead |
+| B — recording arrives after the user has already left the screen | The player is released and the late arrival is discarded |
 | A — chosen track retired by a refresh | Swap to the nearest track within ±4 BPM, rebuild, show PV6 once. The cut list is expressed in beats, so a same-tempo substitute holds up. |
 | A — no alternative track within ±4 BPM | Return to the gallery with PV5 |
 | B — device on silent | Video and ruler still work; no warning shown |
@@ -179,6 +229,7 @@ interface.
 | PV4 | Fewer than 3 usable items remain | "Pick at least 3 items." | Return to media selection |
 | PV5 | Preview could not be built | "We couldn't build a preview. Try a different style." | Return to the gallery |
 | PV6 | Chosen track retired mid-session | "That track isn't available anymore. Here's a similar one." | Auto-swap to the nearest available track within ±4 BPM and rebuild |
+| PV7 | The recording could not be streamed — offline, link expired, link withdrawn, or issued for a different recording | "We couldn't load the track, so you'll hear a click on each beat." *(shown once)* | Fall back to the click. The ruler, the cuts and the export are unaffected |
 
 ---
 
@@ -190,9 +241,11 @@ interface.
 | V2 | Only one cut list build runs at a time; earlier builds are cancelled |
 | V3 | The beat ruler always has exactly one marker per cut in the current cut list |
 | V4 | The preview and the exported file are produced from the **same** cut list object |
-| V5 | The preview never requires a network call once the catalogue is cached |
+| V5 | The preview is never *blocked* by the network once the catalogue is cached — the cut list, the ruler and the click all work offline. Only the track itself needs the network, and its absence is a fallback, never a failure |
 | V7 | A retired track is never left selected — it is always substituted or the user is returned to the gallery |
-| V6 | Backgrounding always releases the video player; foregrounding always recreates it |
+| V6 | Backgrounding always releases the video player **and both audio players**; foregrounding always recreates them |
+| V8 | A recording is never played against a beat grid computed from a different recording. The content hashes must match |
+| V9 | The app never holds an Instagram token and never calls Meta. It streams a link it was given, or it plays the click |
 
 **V4 matters most.** If the preview and the export come from different builds, the user will
 see one thing and get another.
@@ -211,12 +264,19 @@ see one thing and get another.
 ✓ the cut list passed to export is identical to the previewed one (V4)
 ✓ background/foreground cycle does not leak a player            (V6)
 ✓ each error PV1–PV5 fires under its condition
+✓ a link whose contentHash differs from the catalogue's is never played   (V8)
+✓ an expired link is never played, and an undated one is treated as expired
+✓ a non-HTTPS link is never handed to a player
+✓ the click plays while the recording is still arriving, and stops when it lands
+✓ handover keeps the position — the music starts where the click had reached
+✓ a recording that arrives after release is discarded, not played  (V6)
+✓ a failed audio index fetch leaves the cached one in place and shows nothing
 ```
 
 **Definition of Done**
 - [ ] Every transition implemented and tested
 - [ ] Every error shows the exact text in §5
-- [ ] Invariants V1–V6 asserted
+- [ ] Invariants V1–V9 asserted
 - [ ] Gallery renders with no spinner on a cold start with a warm cache
 - [ ] Reduced-motion setting respected
 - [ ] `npm run typecheck` and `npm test` pass, output shown
@@ -242,9 +302,10 @@ Must still pass after this phase:
 5. Tap through 5 templates quickly. Confirm no loading indicator and no crash.
 6. Watch the beat ruler. Confirm markers line up with the moments the picture changes, and that
    clip markers look different from photo markers.
-7. Turn on airplane mode while previewing. Confirm everything still works — video, clicks and
-   ruler. There should be no error at all.
-8. Background the app for 30 seconds, return. Confirm playback resumes and audio still matches
+7. Listen. Confirm **the song is playing**, and that the picture changes on its beats.
+8. Turn on airplane mode and reopen the preview. Confirm the cut list, the ruler and the click
+   all still work, and that the screen says the track could not be loaded — once.
+9. Background the app for 30 seconds, return. Confirm playback resumes and audio still matches
    the picture.
-9. Turn on the system reduced-motion setting. Confirm card previews stop autoplaying.
-10. Tap Shuffle a few times. Confirm the order changes and cuts still land on the beat.
+10. Turn on the system reduced-motion setting. Confirm card previews stop autoplaying.
+11. Tap Shuffle a few times. Confirm the order changes and cuts still land on the beat.

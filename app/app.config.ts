@@ -108,6 +108,11 @@ const config: ExpoConfig = {
   extra: {
     metaAppId: META_APP_ID,
     catalogueUrl: process.env.EXPO_PUBLIC_CATALOGUE_URL ?? "",
+    // Where the preview's audio links live. A different URL from the catalogue's, and not
+    // pinned to the build commit: the song list must not move after a build, and Instagram's
+    // audio links expire in about a day and a half, so they must. Empty means the preview
+    // falls back to the click, which still works.
+    audioIndexUrl: process.env.EXPO_PUBLIC_AUDIO_INDEX_URL ?? "",
     eas: { projectId: process.env.EAS_PROJECT_ID ?? "" },
   },
 

@@ -9,7 +9,11 @@
  */
 
 import { Directory, File, Paths } from "expo-file-system";
-import type { CatalogueNetwork, CatalogueStorage, HttpResponse } from "./types.ts";
+import type {
+  CatalogueNetwork,
+  CatalogueStorage,
+  HttpResponse,
+} from "./types.ts";
 
 const ROOT_NAME = "thumpcut";
 
@@ -88,13 +92,15 @@ export function createDeviceStorage(): CatalogueStorage {
 
 export function createDeviceNetwork(): CatalogueNetwork {
   return {
-    async get(url, timeoutMs): Promise<HttpResponse> {
+    async get(url, timeoutMs, options): Promise<HttpResponse> {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const response = await fetch(url, {
           signal: controller.signal,
-          headers: { Accept: "application/json" },
+          headers: options?.noCache
+            ? { Accept: "application/json", "Cache-Control": "no-cache", Pragma: "no-cache" }
+            : { Accept: "application/json" },
         });
         const body = await response.text();
         return {

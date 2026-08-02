@@ -13,8 +13,10 @@
  */
 
 import { assertUsableBeatMap } from "@thumpcut/cut-engine";
+import { parseAudioIndex } from "../audio/source.ts";
 import { COPY } from "../copy.ts";
 import type {
+  AudioIndex,
   BeatMap,
   Catalogue,
   CatalogueNetwork,
@@ -25,6 +27,7 @@ import type {
 } from "./types.ts";
 
 const CACHE_FILE = "catalogue.json";
+const AUDIO_CACHE_FILE = "audio.json";
 const BEATMAP_DIR = "beatmaps";
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_ATTEMPTS = 3;
@@ -36,6 +39,12 @@ export const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface CatalogueServiceOptions {
   catalogueUrl: string;
+  /**
+   * Where the preview's audio links live. A separate document from a separate URL on purpose
+   * — see `AudioIndex` in `types.ts`. Empty means the preview falls back to the click, which
+   * is a working preview, so it is never treated as an error.
+   */
+  audioIndexUrl?: string;
   storage: CatalogueStorage;
   network: CatalogueNetwork;
   /** Injected so tests are not at the mercy of the clock. */
@@ -45,12 +54,14 @@ export interface CatalogueServiceOptions {
 
 export class CatalogueService {
   private readonly url: string;
+  private readonly audioUrl: string;
   private readonly storage: CatalogueStorage;
   private readonly network: CatalogueNetwork;
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
 
   private catalogue: Catalogue | null = null;
+  private audio: AudioIndex | null = null;
   private state: CatalogueState = "NoCache";
   private message: string | null = null;
   /** K-I4 — only one catalogue fetch is ever in flight. */
@@ -60,6 +71,7 @@ export class CatalogueService {
 
   constructor(options: CatalogueServiceOptions) {
     this.url = options.catalogueUrl.replace(/\/+$/, "");
+    this.audioUrl = (options.audioIndexUrl ?? "").trim();
     this.storage = options.storage;
     this.network = options.network;
     this.now = options.now ?? (() => Date.now());
@@ -80,6 +92,10 @@ export class CatalogueService {
    * blocks when there is nothing to serve (K-I3).
    */
   async load(): Promise<CatalogueSnapshot> {
+    // Read from disk before anything else. Instant, and it means a preview opened while the
+    // network is still waking up already knows where its audio lives.
+    this.audio = await this.readCachedAudioIndex();
+
     const cached = await this.readCache();
     if (cached) {
       this.catalogue = cached;
@@ -147,6 +163,10 @@ export class CatalogueService {
     this.lastRefreshAt = this.now();
     const before = this.catalogue?.catalogueHash;
 
+    // Audio links expire on their own schedule, so this is refreshed every time even when the
+    // song list has not moved a millimetre.
+    await this.refreshAudioIndex();
+
     try {
       const fetched = await this.fetchCatalogue();
       if (fetched.catalogueHash === before) {
@@ -196,6 +216,37 @@ export class CatalogueService {
     }
   }
 
+  /**
+   * Where the preview may fetch each track's recording, as last published.
+   *
+   * Never null-checked by callers for correctness: `planPreviewAudio` treats a missing index
+   * exactly like a missing entry, and both mean the click.
+   */
+  audioIndex(): AudioIndex | null {
+    return this.audio;
+  }
+
+  /**
+   * Fetch the audio links. Silent by design: a preview playing a click is a working preview,
+   * so a failure here is never surfaced and never disturbs the catalogue's own state.
+   */
+  async refreshAudioIndex(): Promise<AudioIndex | null> {
+    if (!this.audioUrl) return this.audio;
+    try {
+      // Never from the phone's cache. The CDN says this file is good for a week; the link
+      // inside it is good for about a day and a half.
+      const body = await this.fetchWithRetries(this.audioUrl, true);
+      const parsed = parseAudioIndex(body);
+      await this.storage.writeTextAtomic(AUDIO_CACHE_FILE, JSON.stringify(parsed));
+      this.audio = parsed;
+    } catch {
+      // Keep whatever was cached. An expired link in it will be caught before it is played,
+      // and a link that is still good is better than no preview audio at all.
+      if (!this.audio) this.audio = await this.readCachedAudioIndex();
+    }
+    return this.audio;
+  }
+
   /** Every track that can actually be used right now (K-I5). */
   async servableTracks(): Promise<CatalogueTrack[]> {
     if (!this.catalogue) return [];
@@ -228,6 +279,7 @@ export class CatalogueService {
     try {
       const fetched = await this.fetchCatalogue();
       await this.commit(fetched);
+      await this.refreshAudioIndex();
       this.lastRefreshAt = this.now();
       this.state = "Ready";
       this.message = null;
@@ -280,6 +332,17 @@ export class CatalogueService {
     }
   }
 
+  private async readCachedAudioIndex(): Promise<AudioIndex | null> {
+    const raw = await this.storage.readText(AUDIO_CACHE_FILE);
+    if (!raw) return null;
+    try {
+      return parseAudioIndex(raw);
+    } catch {
+      // A corrupt index is treated as no index. It is never partially trusted.
+      return null;
+    }
+  }
+
   private async readCachedBeatMap(track: CatalogueTrack): Promise<BeatMap | null> {
     const raw = await this.storage.readText(`${BEATMAP_DIR}/${track.trackId}.json`);
     if (!raw) return null;
@@ -308,11 +371,11 @@ export class CatalogueService {
     return parsed;
   }
 
-  private async fetchWithRetries(url: string): Promise<string> {
+  private async fetchWithRetries(url: string, noCache = false): Promise<string> {
     let lastError = new Error("unknown");
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
       try {
-        const response = await this.network.get(url, REQUEST_TIMEOUT_MS);
+        const response = await this.network.get(url, REQUEST_TIMEOUT_MS, { noCache });
         if (response.status < 200 || response.status >= 300) {
           throw new Error(`HTTP ${response.status}`);
         }

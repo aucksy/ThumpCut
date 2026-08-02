@@ -144,8 +144,22 @@ Must run on a mid-range Android phone with 2GB RAM.
 All beat maps are computed from audio fetched via **Meta's Instagram Audio API `download_url`**.
 Never iTunes, never Spotify, never any other source.
 
-Preview playback in the app is a **metronome click generated on device** (spec 05 §1.1). No
-audio file is fetched at runtime. Build the click.
+## Two different questions about audio. Never confuse them.
+
+Two sessions in a row read one of these as the other, and shipped the wrong thing twice.
+
+**1. The exported MP4 is silent, for ever.** No audio track at all. Putting a commercial
+recording inside a file we hand the user is unlicensed synchronisation, and it is the largest
+legal exposure this product could take. Instagram applies the licensed track after the
+handoff. **Not up for revision.**
+
+**2. The preview inside the app plays the real track.** Owner decision, 2026-08-02, and it
+overrides spec 05 §1.1's old "BUILD MODE A, DO NOT ASK". The benchmark is the Play Store app
+*Beats — Reel Maker for Instagram Beat*, which plays the actual music while previewing. The
+app streams a plain HTTPS link published in `catalogue/audio.json`; it holds no Instagram
+token and calls no Meta API. The metronome click is the **fallback** when the recording cannot
+be fetched — offline, expired link, withdrawn track — and it says so on screen when it happens.
+Never the default.
 
 ## Design rules — non-negotiable
 

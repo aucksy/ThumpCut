@@ -22,6 +22,12 @@ on:
     paths:
       - "factory/**"
       - ".github/workflows/catalogue.yml"
+  schedule:
+    # Every six hours, for one reason: the preview plays the real track, and Instagram's audio
+    # links expire in about a day and a half. This is what keeps a fresh one published. With no
+    # META_ACCESS_TOKEN it produces the same three test tracks it always does, notices nothing
+    # changed, and commits nothing — see `_carry_over_generated_at` in factory/publish.py.
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -66,10 +72,12 @@ jobs:
           find catalogue -type f | sort
 
       - name: Commit it if it changed
+        id: commit
         run: |
           set -euo pipefail
           if git diff --quiet -- catalogue; then
             echo "The catalogue is unchanged."
+            echo "changed=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -79,3 +87,24 @@ jobs:
           # which would republish the catalogue, which would...
           git commit -m "Republish the catalogue [skip ci]"
           git push
+          echo "changed=yes" >> "$GITHUB_OUTPUT"
+
+      - name: Tell the CDN the audio links moved
+        # The app fetches audio.json from the branch rather than from a commit, because a phone
+        # holding an app built last month still has to be able to get a link issued this
+        # morning. jsDelivr holds a branch file at its edge for twelve hours, which is most of
+        # the life of an Instagram audio link. This drops that copy immediately, so a refresh
+        # published now is what the next phone actually gets.
+        #
+        # Free, needs no account and no token. A failure here costs freshness, not correctness
+        # — the app checks the expiry on every link before it plays it — so it never fails the
+        # run.
+        if: steps.commit.outputs.changed == 'yes'
+        continue-on-error: true
+        run: |
+          for path in catalogue/audio.json catalogue/catalogue.json; do
+            url="https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@main/${path}"
+            echo "Purging $path"
+            curl --silent --show-error --max-time 30 "$url" || echo "  purge did not answer"
+            echo
+          done

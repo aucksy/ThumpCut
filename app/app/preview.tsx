@@ -1,17 +1,26 @@
 /**
- * Preview, with the metronome click and the live beat ruler.
+ * Preview, with the real track playing and the live beat ruler.
  *
- * V6 — the player and the click are released whenever the app leaves the foreground and
- * recreated when it comes back. A metronome that keeps ticking in a user's pocket is a bug
- * with a very short path to an uninstall.
+ * Three things are joined up here and nowhere else:
+ *
+ *   · **The audio.** `TrackPreviewAudio` streams the actual recording, with the click covering
+ *     the moment it takes to arrive and carrying the preview entirely if it never does.
+ *   · **The picture.** Whichever of the user's items the cut list says belongs at the current
+ *     moment. This is what makes the sync visible rather than merely audible.
+ *   · **V6.** Both players and the timer are released whenever the app leaves the foreground
+ *     and recreated when it comes back. Audio that keeps playing in a user's pocket is a bug
+ *     with a very short path to an uninstall.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState as RNAppState, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ExportSheet, PreviewScreen } from "../src/screens/index.tsx";
 import { useAppState } from "../src/state/AppState.tsx";
 import { MetronomeAudio } from "../src/audio/MetronomeAudio.ts";
+import type { PreviewAudioMode } from "../src/audio/PreviewAudio.ts";
+import { StreamedAudio } from "../src/audio/StreamedAudio.ts";
+import { TrackPreviewAudio } from "../src/audio/TrackPreviewAudio.ts";
 import { markersForCuts } from "../src/templates/recommend.ts";
 import { formatBpm } from "../src/copy.ts";
 import { createRenderEnvironment } from "../src/render/environment.ts";
@@ -28,15 +37,16 @@ export default function PreviewRoute() {
     templates,
     selectedTemplate,
     selectedTrack,
+    audioPlan,
     notice,
     chooseTemplate,
     shuffle,
   } = useAppState();
 
-  const audio = useRef(new MetronomeAudio()).current;
   const controller = useRef(new RenderController(createRenderEnvironment())).current;
 
   const [positionSec, setPositionSec] = useState(0);
+  const [audioMode, setAudioMode] = useState<PreviewAudioMode>("click");
   const [render, setRender] = useState<RenderSnapshot>(controller.snapshot());
   const [exporting, setExporting] = useState(false);
   /**
@@ -45,6 +55,27 @@ export default function PreviewRoute() {
    * again so a second failure is not swallowed.
    */
   const [dismissedFailure, setDismissedFailure] = useState(false);
+
+  /**
+   * Rebuilt when the plan changes — a different track, or a link that has since expired.
+   * The only place in the app where the two real players are named.
+   */
+  const audio = useMemo(
+    () =>
+      new TrackPreviewAudio({
+        plan: audioPlan,
+        onStatus: (status) => setAudioMode(status.mode),
+        createClick: () => new MetronomeAudio(),
+        createStream: (url) => new StreamedAudio(url),
+      }),
+    [audioPlan],
+  );
+
+  // Releasing on the way out is what stops a replaced player carrying on in the background.
+  useEffect(() => {
+    setAudioMode(audio.status().mode);
+    return () => audio.release();
+  }, [audio]);
 
   useEffect(() => controller.subscribe(setRender), [controller]);
 
@@ -91,6 +122,21 @@ export default function PreviewRoute() {
     };
   }, [audio, beatMap, cutList]);
 
+  /**
+   * The item the cut list says belongs at this moment. Without it the stage is a grey
+   * rectangle and there is nothing to check the music against.
+   */
+  const frameUri = useMemo(() => {
+    if (!cutList) return undefined;
+    const cuts = cutList.cuts;
+    let current = cuts[0];
+    for (const cut of cuts) {
+      if (cut.startSec <= positionSec + 1e-6) current = cut;
+      else break;
+    }
+    return current ? media[current.mediaIndex]?.uri : undefined;
+  }, [cutList, media, positionSec]);
+
   const onExport = useCallback(() => {
     if (!cutList) return;
     setExporting(true);
@@ -116,6 +162,7 @@ export default function PreviewRoute() {
         trackTitle={selectedTrack.title}
         trackArtist={selectedTrack.artist}
         trackTempo={formatBpm(selectedTrack.bpm)}
+        frameUri={frameUri}
         beats={beatMap.beatsSec}
         downbeats={beatMap.downbeatsSec}
         energy={beatMap.energyCurve}
@@ -123,6 +170,7 @@ export default function PreviewRoute() {
         startSec={cutList.audioStartSec}
         durationSec={cutList.totalDurationSec}
         positionSec={positionSec}
+        audioMode={audioMode}
         notice={notice}
         templates={templates}
         selectedTemplateId={selectedTemplate.id}

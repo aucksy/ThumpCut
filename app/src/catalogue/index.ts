@@ -1,6 +1,8 @@
 export { CatalogueService, parseCatalogue, REFRESH_INTERVAL_MS } from "./service.ts";
 export { createDeviceNetwork, createDeviceStorage } from "./adapters.ts";
 export type {
+  AudioIndex,
+  AudioIndexEntry,
   BeatMap,
   Catalogue,
   CatalogueNetwork,

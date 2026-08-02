@@ -18,16 +18,19 @@ whole design avoids it: ThumpCut cuts the pictures to the beat, hands the silent
 Instagram, and **Instagram** puts the licensed track on it. That last step is where the music
 appears, and it is where you will hear whether we got the timing right.
 
-So "preview an actual output with music" happens in two places, and neither is a file on your
-phone:
+**The preview inside the app is a different thing, and it does play the song.** That changed on
+2 August. Open a track, pick a style, and you hear the actual music with the pictures cutting on
+its beats. If the music cannot be fetched — you are offline, or the link has aged out — you get
+a click on each beat instead and the screen tells you so. The click is the safety net now, not
+the normal state.
 
-- **Inside Instagram**, after you tap Share and pick the track. This is the real test.
-- **On your laptop**, in the demo page I sent — which after Part 2 can be rebuilt against a real
-  trending track, so you can hear the actual song against the actual cuts before posting.
+So you can hear the sync in three places:
 
-Inside the ThumpCut app itself, the preview plays a click on each beat rather than the song.
-Streaming Meta's audio into our own app is a separate question about their terms that has not
-been answered, and the app ships without needing that answer.
+- **In the app's preview.** The quickest check, and the one to do first.
+- **Inside Instagram**, after you tap Share and pick the track. This is the real test, because
+  it is Instagram's own copy of the recording.
+- **On your laptop**, in the demo page — which after Part 2 can be rebuilt against a real
+  trending track.
 
 ---
 
@@ -141,7 +144,7 @@ word.
 
 1. Open the app, see **real trending songs**, pick one.
 2. Pick a style, pick your photos and clips.
-3. Watch the preview — the beat ruler moves, a click marks each beat, the pictures cut on them.
+3. Watch the preview — **the song plays**, the beat ruler moves, the pictures cut on the beats.
 4. Export. The reel saves to your gallery, silent.
 5. Tap **Share to Instagram**. Instagram opens with your reel already loaded.
 6. **Pick the same track in Instagram.** This is the moment of truth: the song plays and the

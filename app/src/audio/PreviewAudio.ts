@@ -1,10 +1,17 @@
 /**
  * The preview's audio layer, behind an interface.
  *
- * Mode A — a metronome click generated on the device — is what ships. Whether Meta's terms
- * allow proxying their audio for playback is unresolved, and Mode A needs no answer to that
- * question. When one arrives, a `StreamedAudio` can be dropped in against this same interface
- * without a single screen changing.
+ * Two implementations exist, and one of them wraps the other:
+ *
+ *   · `StreamedAudio` plays the actual recording from a link the Factory published. This is
+ *     what the preview plays.
+ *   · `MetronomeAudio` clicks on every beat, generated on the device with nothing fetched.
+ *     It covers the moment the recording takes to arrive, and it is what is left if the
+ *     recording cannot be fetched at all.
+ *   · `TrackPreviewAudio` owns both and switches between them. The screen holds only that.
+ *
+ * The interface is what the screen sees, and it has never changed — which is the whole reason
+ * adding the real track needed no rewrite of the preview.
  */
 
 import type { BeatMap } from "@thumpcut/cut-engine";
@@ -17,6 +24,15 @@ export interface PreviewAudio {
   /** Release players and timers. Backgrounding must always release; foregrounding recreates. */
   release(): void;
 }
+
+/**
+ * What is coming out of the speaker.
+ *
+ * `connecting` is the recording on its way with the click covering the gap. It says nothing on
+ * screen on purpose — it resolves in a second or two either way, and a message that appears
+ * and vanishes is worse than no message.
+ */
+export type PreviewAudioMode = "streaming" | "connecting" | "click";
 
 /** What the scheduler decides to sound, and when. Pure data, so it can be tested. */
 export interface ScheduledClick {

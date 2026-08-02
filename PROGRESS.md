@@ -10,14 +10,44 @@ Last updated: 2026-08-02.
 | 02 Cut engine | ☑ | ☑ 173 | n/a | Includes property tests over the whole input space. |
 | 03 Catalogue | ☑ | ☑ | ☐ | Logic fully tested. Real network conditions need a phone. |
 | 04 Media selection | ☑ | ☑ | ☐ | Permissions, process death and real photo libraries need a phone. |
-| 05 Preview | ☑ | ☑ | ☐ | Cut list, ruler and click all tested. Playback needs a phone. |
+| 05 Preview | ☑ | ☑ | ☐ | **Plays the real track.** Link, expiry, hash and fallback all tested; a browser was watched streaming the published link and cutting on its beats. The phone's own player is unproven. |
 | 06 Render | ☑ | ☑ | ☐ | Output validation is fully automated. Memory behaviour needs a phone. |
 | 07 Instagram handoff | ☑ | ☑ | ☐ | Blocked on a Meta app id. See OPEN-QUESTIONS. |
 | Design system | ☑ | ☑ 18 | ☐ | 40 screen states rendered, measured and screenshotted on every push. |
 | Cloud build | ☑ | ☑ | ☑ | Green. A 44.8 MB signed APK is published and was opened and checked. |
 
-Totals: **474 automated checks** — 151 Python, 323 TypeScript — plus 4 UI gates over 120
+Totals: **488 automated checks** — 163 Python, 325 TypeScript — plus 4 UI gates over 132
 screen-state measurements.
+
+## The preview plays the real track
+
+Changed 2 August. Spec 05 §1 always said "a live preview with the track streaming"; §1.1's
+"build the click" was a way to unblock the phase without waiting on a terms answer, and it was
+read twice as though it were the design.
+
+How it works, and what each piece is for:
+
+- The Factory publishes `catalogue/audio.json` — one HTTPS link per track, with an expiry and
+  the beat map's content hash. Separate from the song list, because the song list is pinned to
+  the commit an app was built from and must never move, while an Instagram audio link expires
+  in about a day and a half and must.
+- The app streams that link. **No proxy, no backend, no Instagram token on the phone, no Meta
+  API call.** Nothing of theirs is copied or re-served, and the Factory still deletes every
+  byte of audio it downloads.
+- **A link whose hash does not match the beat grid is never played.** This is the only silent
+  failure in the feature: a swapped recording downloads fine, plays fine, and puts every cut a
+  fraction out with nothing erroring.
+- The click covers the second or two of buffering and then hands over in place, at the same
+  position. If the recording never arrives, the click carries the preview and the screen says
+  why. It is a fallback now, never the default.
+- The playhead comes from the player, not from a clock, so a stalled stream cannot show cuts
+  drifting off beats that are exact.
+- The catalogue rebuilds every six hours to keep links fresh, and purges the CDN afterwards.
+- The preview also shows the picture the cut list says belongs at the current moment. Before
+  this the stage was a grey rectangle, which is nothing to watch the music land on.
+
+The three test tracks are ours, so they are served from this repository and never expire — the
+preview plays real music today with no Meta token and no account.
 
 ## Getting it onto a phone
 
@@ -107,6 +137,10 @@ as in `TEST-ON-YOUR-PHONE.md`.
 **Testable now, on the published APK**
 
 1. It opens and reaches the song list.
+1a. **The preview plays the song.** Newly built. The link, the expiry, the hash check and the
+    fallback are all tested, and a browser was watched streaming the published link with the
+    picture changing every two beats — but Android's own player has never been near it. If it
+    clicks instead of playing, the screen says so and that is the symptom to report.
 2. The photo permission prompt is correct.
 3. Refusing permission explains itself and offers settings.
 4. **A 30-item, 15-clip, 300-second export does not run out of memory.** The single largest
@@ -143,12 +177,11 @@ as in `TEST-ON-YOUR-PHONE.md`.
 
 - Embedding real audio in the export so Instagram's fingerprinting swaps in its licensed copy.
   It is unlicensed synchronisation of a commercial recording, and the largest legal exposure
-  in the product. Costs the user one extra tap instead.
-- Streaming real track audio in preview. Blocked on an unanswered question about Meta's terms;
-  the metronome click ships without needing that answer.
+  in the product. Costs the user one extra tap instead. **Not up for revision** — and it is a
+  different question from the preview, which does now play the real track.
 - Everything on the out-of-scope list in `specs/00-overview.md` §5.2.
 
 ## Current plan
 
-The device checklist, in order, on the published APK. Then the two renderer gaps above, then
-iOS.
+The device checklist, in order, on the published APK — starting with whether the preview plays
+the song. Then the two renderer gaps above, then iOS.
