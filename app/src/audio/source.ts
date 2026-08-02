@@ -67,6 +67,20 @@ export function planPreviewAudio(
   return { kind: "stream", url: entry.url };
 }
 
+/**
+ * Whether two plans mean the same thing.
+ *
+ * Used to hold on to the previous plan *object* when nothing about it changed. The preview
+ * rebuilds its cut list every time the user taps a different style, and the audio players are
+ * rebuilt whenever the plan changes — so without this, browsing five styles would drop the
+ * music back into buffering five times for a track that never changed.
+ */
+export function samePlan(a: PreviewAudioPlan, b: PreviewAudioPlan): boolean {
+  if (a.kind === "stream" && b.kind === "stream") return a.url === b.url;
+  if (a.kind === "click" && b.kind === "click") return a.reason === b.reason;
+  return false;
+}
+
 /** Parse and validate an audio index. Anything short of a usable document throws. */
 export function parseAudioIndex(raw: string): AudioIndex {
   const parsed = JSON.parse(raw) as Partial<AudioIndex>;

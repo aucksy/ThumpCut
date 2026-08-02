@@ -14,7 +14,7 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import type { BeatMap } from "@thumpcut/cut-engine";
-import { parseAudioIndex, planPreviewAudio } from "../src/audio/source.ts";
+import { parseAudioIndex, planPreviewAudio, samePlan } from "../src/audio/source.ts";
 import {
   TrackPreviewAudio,
   type StreamPlayer,
@@ -256,6 +256,32 @@ describe("click first, music the moment it arrives", () => {
 
     assert.equal(click.released, true);
     assert.equal(stream.released, true);
+  });
+
+  it("browsing styles does not drop the music back into buffering", async () => {
+    // The cut list is rebuilt on every style tap, which re-runs load(). The track has not
+    // changed, so the stream must survive it — otherwise five taps means five re-buffers.
+    const { audio, stream } = build();
+    await audio.load(BEAT_MAP);
+    audio.play(4);
+    await stream.arrive();
+
+    await audio.load(BEAT_MAP); // the user tapped another style
+    await audio.load(BEAT_MAP); // and another
+
+    assert.equal(audio.status().mode, "streaming");
+    assert.deepEqual(stream.playedFrom, [4], "the music was never restarted");
+  });
+
+  it("recognises a plan that has not really changed", () => {
+    const a = { kind: "stream", url: "https://x.test/a.m4a" } as const;
+    const b = { kind: "stream", url: "https://x.test/a.m4a" } as const;
+    const c = { kind: "stream", url: "https://x.test/b.m4a" } as const;
+    assert.equal(samePlan(a, b), true);
+    assert.equal(samePlan(a, c), false);
+    assert.equal(samePlan({ kind: "click", reason: "expired" }, { kind: "click", reason: "expired" }), true);
+    assert.equal(samePlan({ kind: "click", reason: "expired" }, { kind: "click", reason: "no-entry" }), false);
+    assert.equal(samePlan(a, { kind: "click", reason: "expired" }), false);
   });
 
   it("never creates a stream at all when the plan says click", async () => {

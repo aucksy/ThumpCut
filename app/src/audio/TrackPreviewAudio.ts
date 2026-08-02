@@ -92,6 +92,11 @@ export class TrackPreviewAudio implements PreviewAudio {
       return;
     }
 
+    // Idempotent on purpose. Loading is re-run whenever the cut list changes — the user tapped
+    // a different style — and the track has not changed, so tearing the stream down and
+    // starting it again would drop the music into buffering every time they browse styles.
+    if (this.stream) return;
+
     const stream = this.makeStream(this.plan.url);
     this.stream = stream;
     this.announce("connecting", null);

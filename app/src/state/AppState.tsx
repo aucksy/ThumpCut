@@ -21,7 +21,7 @@ import {
 } from "react";
 import Constants from "expo-constants";
 import { buildCutList, type CutList, type MediaItem } from "@thumpcut/cut-engine";
-import { planPreviewAudio, type PreviewAudioPlan } from "../audio/source.ts";
+import { planPreviewAudio, samePlan, type PreviewAudioPlan } from "../audio/source.ts";
 import {
   CatalogueService,
   createDeviceNetwork,
@@ -148,7 +148,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setBeatMap(map);
       setSelectedTrack(track);
       setSelectedTemplate(template);
-      setAudioPlan(planPreviewAudio(service.audioIndex(), track, Date.now()));
+      // Same plan, same object — see `samePlan`. Tapping through five styles must not restart
+      // the music five times for a track that never changed.
+      const next = planPreviewAudio(service.audioIndex(), track, Date.now());
+      setAudioPlan((current) => (samePlan(current, next) ? current : next));
       setCutList(buildCutList(map, items, template));
     },
     [catalogue.catalogue, service],
