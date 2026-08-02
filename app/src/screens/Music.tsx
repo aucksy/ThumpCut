@@ -14,6 +14,7 @@
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { alpha, colors, layout, radius, space } from "@thumpcut/design-tokens";
 import { COPY, formatDuration, formatPercent } from "../copy.ts";
+import { titleFromFilename } from "../music/localTracks.ts";
 import type { LocalMusicSnapshot, LocalSong } from "../music/localTracks.ts";
 import { CenterMessage, Screen, TopBar } from "../ui/chrome.tsx";
 import { Toast } from "../ui/feedback.tsx";
@@ -55,18 +56,21 @@ export function MusicScreen({ snapshot, onBack, onPick, onOpenSettings }: MusicS
             {snapshot.songs.map((song) => {
               const isThisOne = analysing && snapshot.analysingId === song.id;
               const dimmed = analysing && !isThisOne;
+              // The cleaned name, not the raw filename: "01-Night_Drive_Demo.mp3" is a
+              // developer's view of a song. The same cleaning names the analysed track.
+              const title = titleFromFilename(song.filename);
               return (
                 <Pressable
                   key={song.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`${song.filename}, ${formatDuration(song.durationSec)}`}
+                  accessibilityLabel={`${title}, ${formatDuration(song.durationSec)}`}
                   disabled={analysing}
                   onPress={() => onPick?.(song)}
                   style={[styles.row, isThisOne && styles.rowActive, dimmed && styles.rowDimmed]}
                   testID={`music-song-${song.id}`}
                 >
                   <View style={styles.rowText}>
-                    <Body numberOfLines={1}>{song.filename}</Body>
+                    <Body numberOfLines={1}>{title}</Body>
                     {isThisOne ? (
                       <Label style={styles.progress} testID="music-analysing">
                         {COPY.music.analysing}

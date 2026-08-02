@@ -13,6 +13,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   useRef,
@@ -20,6 +21,7 @@ import {
   type ReactNode,
 } from "react";
 import Constants from "expo-constants";
+import { File, Paths } from "expo-file-system";
 import { buildCutList, type CutList, type MediaItem } from "@thumpcut/cut-engine";
 import { planPreviewAudio, samePlan, type PreviewAudioPlan } from "../audio/source.ts";
 import {
@@ -31,10 +33,13 @@ import {
   type CatalogueTemplate,
   type CatalogueTrack,
 } from "../catalogue/index.ts";
+import { bundledCatalogue } from "../catalogue/bundled.ts";
 import {
+  deserialiseSelection,
   initialSelectionState,
   selectionReducer,
   selectionToMedia,
+  serialiseSelection,
   type SelectionAction,
   type SelectionState,
 } from "../media/selection.ts";
@@ -90,6 +95,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     new CatalogueService({
       catalogueUrl: CATALOGUE_URL,
       audioIndexUrl: AUDIO_INDEX_URL,
+      bundled: bundledCatalogue(),
       storage: createDeviceStorage(),
       network: createDeviceNetwork(),
     }),
@@ -97,6 +103,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const [catalogue, setCatalogue] = useState<CatalogueSnapshot>(service.snapshot());
   const [selection, dispatchSelection] = useReducer(selectionReducer, initialSelectionState());
+
+  // M6 — the selection survives process death. The pure serialisation lives in
+  // `media/selection.ts` and is tested; this is only the disk on either side of it.
+  // Restore is dispatched once the file is read: the reducer keeps whatever the user has
+  // already picked, and prunes anything the library no longer has when it loads.
+  const selectionFile = useRef(new File(Paths.document, "selection.json")).current;
+  const restored = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const raw = selectionFile.exists ? await selectionFile.text() : null;
+        const persisted = deserialiseSelection(raw);
+        if (alive && persisted) {
+          dispatchSelection({
+            type: "restore",
+            selectedIds: persisted.selectedIds,
+            inPoints: persisted.inPoints,
+          });
+        }
+      } catch {
+        // A corrupt file means starting clean, exactly like a fresh install.
+      }
+      restored.current = true;
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!restored.current) return;
+    try {
+      selectionFile.write(serialiseSelection(selection));
+    } catch {
+      // Persistence is best-effort: a failed write costs a restore, never the session.
+    }
+  }, [selection, selectionFile]);
   const [selectedTemplate, setSelectedTemplate] = useState<CatalogueTemplate | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<CatalogueTrack | null>(null);
   const [beatMap, setBeatMap] = useState<BeatMap | null>(null);

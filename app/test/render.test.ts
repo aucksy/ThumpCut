@@ -653,10 +653,87 @@ describe("what the native side receives", () => {
     const native = toNativeCuts(list, items);
     assert.equal(native[0]?.kind, "photo");
     assert.equal(native[0]?.kenBurnsTo, 1.06);
+    assert.equal(native[0]?.holdDurationSec, 0);
+    assert.equal(native[0]?.transitionIn, "cut");
     assert.equal(native[1]?.rotationDeg, 90);
     assert.equal(native[1]?.speed, 0.8);
     assert.equal(native[1]?.sourceOutSec, 2.6);
     assert.equal(native[1]?.durationSec, 2);
+    assert.equal(native[1]?.holdDurationSec, 0);
+  });
+
+  it("computes how long a short clip's last frame must hold, at the cut's own speed", () => {
+    const items: MediaItem[] = [
+      {
+        id: "b",
+        uri: "file:///b.mp4",
+        kind: "video",
+        width: 1920,
+        height: 1080,
+        rotationDeg: 0,
+        durationSec: 1.2,
+      },
+    ];
+    const list: CutList = {
+      totalDurationSec: 2,
+      audioStartSec: 0,
+      cuts: [
+        // Plays 0.2..1.2 (one second of source) at half speed: two seconds of screen time
+        // from a 3s slot leaves exactly 1s frozen on the last frame.
+        {
+          mediaIndex: 0,
+          startSec: 0,
+          endSec: 3,
+          sourceInSec: 0.2,
+          sourceOutSec: 1.2,
+          speed: 0.5,
+          freezeFromSec: 1.2,
+          transitionIn: "crossfade",
+        },
+      ],
+      itemsUsed: 1,
+      itemsDropped: 0,
+    };
+
+    const native = toNativeCuts(list, items);
+    assert.equal(native[0]?.holdDurationSec, 1);
+    assert.equal(native[0]?.transitionIn, "crossfade");
+  });
+
+  it("holds for the whole slot when the clip has nothing left to play", () => {
+    const items: MediaItem[] = [
+      {
+        id: "b",
+        uri: "file:///b.mp4",
+        kind: "video",
+        width: 1920,
+        height: 1080,
+        rotationDeg: 0,
+        durationSec: 5,
+      },
+    ];
+    const list: CutList = {
+      totalDurationSec: 2,
+      audioStartSec: 0,
+      cuts: [
+        // The in-point sits at the end of the clip: the source plays nothing, the still
+        // covers everything.
+        {
+          mediaIndex: 0,
+          startSec: 0,
+          endSec: 2,
+          sourceInSec: 5,
+          sourceOutSec: 5,
+          speed: 1,
+          freezeFromSec: 5,
+          transitionIn: "cut",
+        },
+      ],
+      itemsUsed: 1,
+      itemsDropped: 0,
+    };
+
+    assert.equal(toNativeCuts(list, items)[0]?.holdDurationSec, 2);
   });
 
   it("refuses a cut that points at media which is not there", () => {

@@ -69,10 +69,14 @@ me a screenshot of the red one.
 - **The Instagram button will not appear.** Not a bug: sharing to Instagram needs an ID from
   Meta that is not set yet. Rather than show you a button that fails, the app hides it.
   **Save to gallery works, and so does the whole Your-music path above.**
-- **Photos do not drift or zoom yet.** They hold still. The gentle zoom is designed but not
-  built into the video yet.
-- **Template cards do not move.** They show a still panel. That is the designed fallback, not
-  a broken card.
+- **NEW: the app opens instantly, even offline.** The song list is now built into the app
+  itself. First open goes straight to the styles — no "Getting things ready" — and a fresh
+  install works in airplane mode.
+- **NEW: the style cards have artwork that moves.** Each card shows coloured bars — the
+  rhythm of that style — with a thin amber line sweeping across. Fast styles sweep fast.
+- **NEW: exports have the designed motion.** Photos drift and zoom gently; "Golden hour"
+  softens each cut through a brief dip; "Heat" lands each cut with a small punch; a clip too
+  short for its moment holds its last frame instead of failing the export.
 
 ---
 
@@ -217,6 +221,41 @@ this page.
 **25. Share anywhere.**
 Same screen, tap **Share anywhere** and pick WhatsApp (or anything). Send it to yourself.
 *Right if:* the received video plays with the music in it.
+
+### This session's polish — the five quick ones
+
+**26. The style cards move.**
+Open the app and just look at the home screen. Every card should show coloured bars with a
+thin amber line sweeping across, and each card's pattern should look different — the "Heat"
+card spiky and fast, "Golden hour" soft and slow.
+*Wrong if:* any card is a plain empty rectangle, or nothing moves.
+
+**27. It works fresh out of the box with no internet.**
+Uninstall ThumpCut, turn on airplane mode, reinstall from the file you downloaded earlier,
+and open it. You should get the full styles screen instantly, and the whole Your-music path
+(21–25) should work end to end — the preview will use the click sound, which is honest,
+because streaming needs a connection.
+*Wrong if:* it says you're offline and stops, or the styles screen is empty.
+
+**28. Photos move in the finished video.**
+Make a reel from photos only and play the export. Each photo should drift or zoom very
+gently — barely noticeable, but not frozen.
+*Wrong if:* photos are completely still, or the movement is violent.
+
+**29. Each style cuts differently.**
+Export the same photos with "Golden hour" and again with "Heat". Golden hour's cuts should
+soften through a brief dip to dark; Heat's should land with a small zoom punch.
+*Wrong if:* both look identical, or a dip lasts so long the reel goes black.
+
+**30. A too-short clip no longer breaks the export.**
+Record a one-second video clip. Make a reel with it and a slow style like Coastline.
+*Right if:* the reel exports, and that clip plays then holds its last frame until the next
+cut.
+*Wrong if:* the export fails, or the clip's slot shows black.
+
+**31. Settings tells the truth.**
+Open Settings. The version line should show this build's number (not "(1)" for ever), and
+tapping Privacy policy should open a readable page saying the app collects nothing.
 
 ### Not yet — here so they are not forgotten
 

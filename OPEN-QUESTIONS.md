@@ -81,15 +81,6 @@ and 150 BPM, credited to "ThumpCut Test Kit" so nobody mistakes them for real mu
 timing test is genuine against them. The one thing they cannot prove is that the cuts still
 land on the beat once Instagram applies its own copy of a real recording.
 
-## Q — Are there template preview videos, or should the gallery ship with stills?
-**Phase:** 5
-**Blocking:** no
-**What I need:** Either five short looping preview videos (one per style), or a decision to
-ship with still frames for now.
-**What I did meanwhile:** Built the specified fallback — a card with no cached preview shows a
-still, and one with no still shows a plain panel. Never an empty box, never a shimmer. The
-gallery works; it just does not move yet.
-
 ## Q — Amex employment contract: IP assignment and exclusivity
 **Phase:** none — commercial, not technical
 **Blocking:** no for building, yes for public release
@@ -101,6 +92,12 @@ forgotten before any store submission.
 ---
 
 ## Answered
+
+**Are there template preview videos, or should the gallery ship with stills?** — Answered
+2026-08-02 without needing either. The cards now draw their own artwork: the style's cutting
+rhythm as coloured bars with a sweeping amber playhead, generated from the design system, a
+different pattern per style, with motion. Real preview videos, if they ever exist, simply
+take the card over — the code prefers real art. Nothing left to decide.
 
 **Where should the catalogue be hosted, and under what URL?** — Answered 2026-08-02 without
 needing a decision. It lives in `catalogue/` in this repository and is served by jsDelivr,

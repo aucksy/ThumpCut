@@ -126,6 +126,53 @@ editing are let in; the app shows the credit line to copy into a caption.
 
 ---
 
+## Part 4 — The Play Store, when release day comes
+
+Nothing here is needed to keep testing on your own phone. This is the checklist for the day
+strangers install ThumpCut. Each line says whose job it is.
+
+**1. A Google Play developer account — you.** One-time $25 at
+<https://play.google.com/console/signup>, with identity verification that can take a few
+days. Start this early; everything else waits on it.
+
+**2. A real signing key — you say the word, the next session does the work.** Today every
+build is signed with a **throwaway test key whose password is public in this repository**.
+That is fine for your own phone and would be reckless for a store release. The fix is
+standard and Google runs most of it: the app enrols in **Play App Signing** (Google holds
+the real key), and builds are signed with an "upload key" that lives only in the
+repository's secrets. When you are ready, say "set up the release key" — the session will
+build the one-off tool that creates it, and you will paste two secrets and keep one file
+somewhere safe. Ten minutes of your time; none of it is code.
+
+**3. The store listing — you, about an hour.** The Play Console asks for:
+   - **A privacy policy URL.** Already done — paste exactly this:
+     `https://cdn.jsdelivr.net/gh/aucksy/ThumpCut@main/docs/privacy.html`
+     (It says the truth: the app collects nothing. The same page opens from the app's
+     Settings screen.)
+   - **The data-safety form.** Answer "no data collected, no data shared" throughout —
+     that is true, and it must keep being true or both the form and the policy are wrong.
+   - **Screenshots** — from your phone, of the real app.
+   - **The content rating questionnaire** — a form about violence, gambling and so on;
+     for ThumpCut every answer is no.
+
+**4. Flip the Meta app to Live — you, one tap** (only if Part 1 was done). In the Meta
+dashboard: App Mode switch from Development to **Live**, or Instagram sharing works only on
+your own account. Already noted in Part 1; repeated here so release day has one list.
+
+**5. The two Jamendo promises — standing, forever** (only if Part 3 was done). The day
+ThumpCut earns money in any form — ads included — write to licensing@jamendo.com **before**
+that happens. And the app must never offer offline downloads of those songs. Both are the
+deal that makes the royalty-free section legal, not settings anyone can change.
+
+**6. Your employment contract — you.** Before anything public: confirm your contract does
+not hand this project's ownership to your employer. It has been in the open questions list
+since the start; a store release is the moment it stops being postponable.
+
+**Version numbers — nobody, it is automatic.** Every build already gets the next number on
+its own, the file you download is named with it, and the Settings screen shows it.
+
+---
+
 ## After all three parts — the full test
 
 1. Open the app: real trending songs, a royalty-free group, and Your music, all in one row.

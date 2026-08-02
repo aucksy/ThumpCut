@@ -9,6 +9,7 @@ import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { border, colors, fontFamily, palette, radius, space } from "@thumpcut/design-tokens";
 import type { CatalogueTemplate } from "../catalogue/types.ts";
+import { TemplatePoster } from "./TemplatePoster.tsx";
 
 export function TemplateStrip({
   templates,
@@ -42,7 +43,15 @@ export function TemplateStrip({
                   accessible={false}
                   transition={0}
                 />
-              ) : null}
+              ) : (
+                <TemplatePoster
+                  seed={template.id}
+                  beatsPerSlide={template.density.medium}
+                  transition={template.transition}
+                  animated={false}
+                  style={StyleSheet.absoluteFill}
+                />
+              )}
             </View>
             <Text
               numberOfLines={1}

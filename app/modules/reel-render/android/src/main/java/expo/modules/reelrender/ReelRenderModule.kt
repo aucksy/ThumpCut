@@ -3,8 +3,10 @@ package expo.modules.reelrender
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.C
@@ -13,7 +15,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.audio.SpeedProvider
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.Presentation
+import androidx.media3.effect.RgbMatrix
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -36,6 +40,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Composing the reel on Android, with Media3 Transformer.
@@ -75,6 +80,16 @@ class ReelRenderModule : Module() {
     private const val OUTPUT_HEIGHT = 1920
     private const val FRAME_RATE = 30
     private const val PROGRESS_POLL_MS = 250L
+
+    /** Each side of a crossfade dip: the outgoing shot falls to dark, the incoming one rises. */
+    private const val DIP_HALF_US = 150_000L
+    /** A zoom punch lands on the cut and settles within four frames. */
+    private const val PUNCH_DURATION_US = 130_000L
+    private const val PUNCH_FROM_SCALE = 1.08f
+    /** Freeze frames are decoded no larger than this on their long side. */
+    private const val FREEZE_MAX_DIMENSION = 1920
+    /** Below this a part is not worth a media item: it is less than a frame at 30fps. */
+    private const val MIN_PART_SEC = 0.02
   }
 
   /** Everything below is touched only from this thread. See the class comment. */
@@ -87,7 +102,25 @@ class ReelRenderModule : Module() {
   /** One render, and the single place that decides it is over. */
   private class Pending(val continuation: Continuation<Double>) {
     var settled = false
+    /** Freeze-frame stills extracted for this run. Deleted when the run settles. */
+    val scratch = mutableListOf<File>()
   }
+
+  /** One cut as the JavaScript side sent it, typed, with its freeze frame when one is needed. */
+  private data class ParsedCut(
+    val uri: String,
+    val kind: String,
+    val durationSec: Double,
+    val sourceInSec: Double,
+    val sourceOutSec: Double,
+    val speed: Double,
+    val freezeFromSec: Double?,
+    val holdDurationSec: Double,
+    val kenBurnsFrom: Double?,
+    val kenBurnsTo: Double?,
+    val transitionIn: String,
+    val freezeFrame: File?,
+  )
 
   override fun definition() = ModuleDefinition {
     Name("ReelRender")
@@ -168,36 +201,109 @@ class ReelRenderModule : Module() {
     cuts: List<Map<String, Any?>>,
     outputPath: String,
     audio: Map<String, Any?>?,
-  ): Double =
-    suspendCoroutine { continuation ->
-      val context = appContext.reactContext
-      if (context == null) {
-        continuation.resumeWithException(
-          CodedException("unknown", "The app has no context to render in.", null)
-        )
-        return@suspendCoroutine
-      }
+  ): Double {
+    val context = appContext.reactContext
+      ?: throw CodedException("unknown", "The app has no context to render in.", null)
+
+    // Freeze frames are decoded here, on the module's background dispatcher, before anything
+    // touches the main thread. Extracting a frame takes long enough to jank an animation, and
+    // the main thread is where Transformer itself must live.
+    val parsed = parseCuts(context, cuts)
+
+    return suspendCoroutine { continuation ->
       main.post {
         if (pending != null) {
           // R-I8 — one render at a time. The orchestrator already guards this; so does this.
+          parsed.mapNotNull { it.freezeFrame }.forEach { it.delete() }
           continuation.resumeWithException(
             CodedException("unknown", "An export is already running.", null)
           )
           return@post
         }
         val holder = Pending(continuation)
+        holder.scratch.addAll(parsed.mapNotNull { it.freezeFrame })
         pending = holder
         try {
-          begin(context, cuts, outputPath, audio, holder)
+          begin(context, parsed, outputPath, audio, holder)
         } catch (error: Throwable) {
           settle(holder) { it.resumeWithException(asCoded(error)) }
         }
       }
     }
+  }
+
+  /** Type every cut, and extract the still any frozen tail will hold on. */
+  private fun parseCuts(context: Context, cuts: List<Map<String, Any?>>): List<ParsedCut> {
+    val extracted = mutableListOf<File>()
+    try {
+      return cuts.mapIndexed { index, cut ->
+        val uri = cut["uri"] as? String
+          ?: throw CodedException("unknown", "A cut has no source.", null)
+        val kind = cut["kind"] as? String ?: "photo"
+        val holdDurationSec = cut["holdDurationSec"] as? Double ?: 0.0
+        val freezeFromSec = cut["freezeFromSec"] as? Double
+        val needsStill = kind == "video" && holdDurationSec > MIN_PART_SEC && freezeFromSec != null
+        val freezeFrame = if (needsStill) {
+          extractFreezeFrame(context, uri, freezeFromSec as Double, index).also(extracted::add)
+        } else {
+          null
+        }
+        ParsedCut(
+          uri = uri,
+          kind = kind,
+          durationSec = cut["durationSec"] as? Double ?: 0.0,
+          sourceInSec = cut["sourceInSec"] as? Double ?: 0.0,
+          sourceOutSec = cut["sourceOutSec"] as? Double ?: 0.0,
+          speed = cut["speed"] as? Double ?: 1.0,
+          freezeFromSec = freezeFromSec,
+          holdDurationSec = holdDurationSec,
+          kenBurnsFrom = cut["kenBurnsFrom"] as? Double,
+          kenBurnsTo = cut["kenBurnsTo"] as? Double,
+          transitionIn = cut["transitionIn"] as? String ?: "cut",
+          freezeFrame = freezeFrame,
+        )
+      }
+    } catch (error: Throwable) {
+      extracted.forEach { it.delete() }
+      throw error
+    }
+  }
+
+  /**
+   * The frame a too-short clip will hold on, saved as a JPEG the composition can show like
+   * any photo. Decoded once, bounded in size (R-I5, R-I6), and aimed one frame short of the
+   * requested moment so a freeze at the very end of a file still lands on a real frame.
+   */
+  private fun extractFreezeFrame(context: Context, uri: String, atSec: Double, index: Int): File {
+    val retriever = MediaMetadataRetriever()
+    try {
+      retriever.setDataSource(context, Uri.parse(if (uri.startsWith("/")) "file://$uri" else uri))
+      val timeUs = ((atSec * 1_000_000).toLong() - 16_000L).coerceAtLeast(0L)
+      val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+        retriever.getScaledFrameAtTime(
+          timeUs,
+          MediaMetadataRetriever.OPTION_CLOSEST,
+          FREEZE_MAX_DIMENSION,
+          FREEZE_MAX_DIMENSION,
+        )
+      } else {
+        retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+      } ?: throw CodedException("unknown", "The clip's last frame could not be read.", null)
+      val file = File(context.cacheDir, "reelrender-freeze-$index.jpg")
+      try {
+        file.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+      } finally {
+        frame.recycle()
+      }
+      return file
+    } finally {
+      retriever.release()
+    }
+  }
 
   private fun begin(
     context: Context,
-    cuts: List<Map<String, Any?>>,
+    cuts: List<ParsedCut>,
     outputPath: String,
     audio: Map<String, Any?>?,
     holder: Pending,
@@ -208,7 +314,7 @@ class ReelRenderModule : Module() {
 
     if (cuts.isEmpty()) throw CodedException("unknown", "There is nothing to render.", null)
 
-    val items = cuts.map(::toEditedMediaItem)
+    val items = buildItems(cuts)
 
     val sequence = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO))
       .addItems(items)
@@ -259,18 +365,155 @@ class ReelRenderModule : Module() {
     startPolling()
   }
 
-  private fun toEditedMediaItem(cut: Map<String, Any?>): EditedMediaItem {
-    val uri = cut["uri"] as? String
-      ?: throw CodedException("unknown", "A cut has no source.", null)
-    val kind = cut["kind"] as? String ?: "photo"
-    val startMs = ((cut["sourceInSec"] as? Double ?: 0.0) * 1000).toLong()
-    val endMs = ((cut["sourceOutSec"] as? Double ?: 0.0) * 1000).toLong()
-    val durationUs = ((cut["durationSec"] as? Double ?: 0.0) * 1_000_000).toLong()
-    val speed = (cut["speed"] as? Double ?: 1.0).toFloat()
+  /**
+   * Expand the cut list into the composition's media items.
+   *
+   * A cut becomes one item — or two, when a clip runs out before its slot does: the clip
+   * itself, then a still of its last frame holding until the next cut. The designed motion
+   * rides along here: Ken Burns on photos, and per-cut transitions.
+   *
+   * The transitions are entrance-and-exit effects rather than overlaps, on purpose. A true
+   * overlap dissolve needs two decoders running at once, and nothing in this renderer decodes
+   * in parallel (R-I4) — that rule is what keeps a 30-item export alive on a 2GB phone. So
+   * "crossfade" renders as a dip: the outgoing shot falls towards dark over 150ms and the
+   * incoming one rises out of it, which cuts on the same frame the beat lands on. "zoomPunch"
+   * lands 8% tight on the cut and settles within four frames.
+   */
+  private fun buildItems(cuts: List<ParsedCut>): List<EditedMediaItem> {
+    val items = mutableListOf<EditedMediaItem>()
 
-    // Centre-crop to 9:16 rather than letterbox. Bars on a reel look like a mistake.
-    // Source rotation is deliberately not applied here — see the class comment.
-    val effects: List<Effect> = listOf(
+    cuts.forEachIndexed { index, cut ->
+      val exitCrossfade = cuts.getOrNull(index + 1)?.transitionIn == "crossfade"
+
+      if (cut.kind == "photo") {
+        items.add(photoItem(cut, cut.durationSec, cut.transitionIn, exitCrossfade))
+        return@forEachIndexed
+      }
+
+      val playedSec = (cut.sourceOutSec - cut.sourceInSec) / (if (cut.speed > 0) cut.speed else 1.0)
+      val still = cut.freezeFrame
+
+      if (playedSec > MIN_PART_SEC) {
+        // The clip fades out only when nothing holds after it; otherwise the still owns the exit.
+        val followingStill =
+          if (still != null && cut.holdDurationSec > MIN_PART_SEC) still else null
+        items.add(
+          videoItem(
+            cut,
+            entrance = cut.transitionIn,
+            exitCrossfade = exitCrossfade && followingStill == null,
+            partDurationSec = playedSec,
+          )
+        )
+        if (followingStill != null) {
+          items.add(freezeItem(followingStill, cut.holdDurationSec, entrance = null, exitCrossfade))
+        }
+      } else if (still != null) {
+        // Nothing left of the clip to play: the still covers the whole slot.
+        items.add(freezeItem(still, cut.durationSec, entrance = cut.transitionIn, exitCrossfade))
+      } else {
+        // No playable stretch and no still to hold on — the cut cannot be rendered honestly.
+        throw CodedException("unknown", "A clip had nothing left to play.", null)
+      }
+    }
+
+    return items
+  }
+
+  private fun videoItem(
+    cut: ParsedCut,
+    entrance: String,
+    exitCrossfade: Boolean,
+    partDurationSec: Double,
+  ): EditedMediaItem {
+    val startMs = (cut.sourceInSec * 1000).toLong()
+    val endMs = (cut.sourceOutSec * 1000).toLong()
+    val speed = cut.speed.toFloat()
+
+    val mediaItem = MediaItem.Builder()
+      .setUri(Uri.parse(cut.uri))
+      .setClippingConfiguration(
+        MediaItem.ClippingConfiguration.Builder()
+          .setStartPositionMs(startMs)
+          .setEndPositionMs(max(endMs, startMs + 1))
+          .build()
+      )
+      .build()
+
+    val builder = EditedMediaItem.Builder(mediaItem)
+      .setEffects(
+        Effects(
+          emptyList(),
+          visualEffects(entrance, exitCrossfade, null, null, partDurationSec),
+        )
+      )
+      // The export is silent by design. Removing audio here means no stray silent track can
+      // survive into the file (G2).
+      .setRemoveAudio(true)
+
+    if (speed != 1.0f && speed > 0f) {
+      // A slot the clip does not exactly fill is filled by playing it faster or slower. If this
+      // is dropped the cut runs short or long and every cut after it slides off the beat.
+      builder.setSpeed(ConstantSpeed(speed))
+    }
+
+    return builder.build()
+  }
+
+  private fun photoItem(
+    cut: ParsedCut,
+    partDurationSec: Double,
+    entrance: String?,
+    exitCrossfade: Boolean,
+  ): EditedMediaItem {
+    val durationUs = (partDurationSec * 1_000_000).toLong()
+    return EditedMediaItem.Builder(MediaItem.fromUri(Uri.parse(cut.uri)))
+      .setEffects(
+        Effects(
+          emptyList(),
+          visualEffects(entrance, exitCrossfade, cut.kenBurnsFrom, cut.kenBurnsTo, partDurationSec),
+        )
+      )
+      .setRemoveAudio(true)
+      .setDurationUs(max(durationUs, 1L))
+      .setFrameRate(FRAME_RATE)
+      .build()
+  }
+
+  private fun freezeItem(
+    frame: File,
+    partDurationSec: Double,
+    entrance: String?,
+    exitCrossfade: Boolean,
+  ): EditedMediaItem {
+    val durationUs = (partDurationSec * 1_000_000).toLong()
+    return EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(frame)))
+      .setEffects(
+        Effects(
+          emptyList(),
+          visualEffects(entrance, exitCrossfade, null, null, partDurationSec),
+        )
+      )
+      .setRemoveAudio(true)
+      .setDurationUs(max(durationUs, 1L))
+      .setFrameRate(FRAME_RATE)
+      .build()
+  }
+
+  /**
+   * The visual chain for one part: centre-crop to 9:16, then any Ken Burns drift, then the
+   * transition. Centre-crop first, rather than letterbox — bars on a reel look like a mistake.
+   * Source rotation is deliberately not applied here; see the class comment.
+   */
+  private fun visualEffects(
+    entrance: String?,
+    exitCrossfade: Boolean,
+    kenBurnsFrom: Double?,
+    kenBurnsTo: Double?,
+    partDurationSec: Double,
+  ): List<Effect> {
+    val partDurationUs = (partDurationSec * 1_000_000).toLong()
+    val effects = mutableListOf<Effect>(
       Presentation.createForWidthAndHeight(
         OUTPUT_WIDTH,
         OUTPUT_HEIGHT,
@@ -278,36 +521,24 @@ class ReelRenderModule : Module() {
       )
     )
 
-    val mediaItem = if (kind == "photo") {
-      MediaItem.fromUri(Uri.parse(uri))
-    } else {
-      MediaItem.Builder()
-        .setUri(Uri.parse(uri))
-        .setClippingConfiguration(
-          MediaItem.ClippingConfiguration.Builder()
-            .setStartPositionMs(startMs)
-            .setEndPositionMs(max(endMs, startMs + 1))
-            .build()
-        )
-        .build()
+    if (kenBurnsFrom != null && kenBurnsTo != null) {
+      // Scales below 1 would pull the picture inside the frame and show the void behind it.
+      val from = max(1.0, kenBurnsFrom).toFloat()
+      val to = max(1.0, kenBurnsTo).toFloat()
+      if (from != to) effects.add(AnimatedZoom(from, to, partDurationUs))
     }
 
-    val builder = EditedMediaItem.Builder(mediaItem)
-      .setEffects(Effects(emptyList(), effects))
-      // The export is silent by design. Removing audio here means no stray silent track can
-      // survive into the file (G2).
-      .setRemoveAudio(true)
-
-    if (kind == "photo") {
-      builder.setDurationUs(max(durationUs, 1L))
-      builder.setFrameRate(FRAME_RATE)
-    } else if (speed != 1.0f && speed > 0f) {
-      // A slot the clip does not exactly fill is filled by playing it faster or slower. If this
-      // is dropped the cut runs short or long and every cut after it slides off the beat.
-      builder.setSpeed(ConstantSpeed(speed))
+    if (entrance == "zoomPunch") {
+      effects.add(AnimatedZoom(PUNCH_FROM_SCALE, 1f, min(PUNCH_DURATION_US, partDurationUs)))
     }
 
-    return builder.build()
+    val fadeInUs = if (entrance == "crossfade") min(DIP_HALF_US, partDurationUs / 2) else 0L
+    val fadeOutUs = if (exitCrossfade) min(DIP_HALF_US, partDurationUs / 2) else 0L
+    if (fadeInUs > 0 || fadeOutUs > 0) {
+      effects.add(AnimatedDip(fadeInUs, fadeOutUs, partDurationUs))
+    }
+
+    return effects
   }
 
   /**
@@ -390,6 +621,10 @@ class ReelRenderModule : Module() {
     transformer = null
     if (pending === holder) pending = null
 
+    // The freeze stills are scratch. Success, failure and cancel all sweep them.
+    holder.scratch.forEach { it.delete() }
+    holder.scratch.clear()
+
     finish(holder.continuation)
   }
 
@@ -401,5 +636,67 @@ class ReelRenderModule : Module() {
   private class ConstantSpeed(private val speed: Float) : SpeedProvider {
     override fun getSpeed(timeUs: Long): Float = speed
     override fun getNextSpeedChangeTimeUs(timeUs: Long): Long = C.TIME_UNSET
+  }
+
+  /**
+   * A zoom that moves across this item's run: Ken Burns on a photo, or the settling punch of
+   * a zoomPunch cut. Scaling in normalised device coordinates is a zoom about the centre.
+   *
+   * Time is measured from the first frame this instance sees rather than from zero — each
+   * item's effect instances are its own, but whether the timestamps handed to effects start
+   * at the item or at the composition is an implementation detail this must not depend on.
+   */
+  private class AnimatedZoom(
+    private val fromScale: Float,
+    private val toScale: Float,
+    private val rampDurationUs: Long,
+  ) : MatrixTransformation {
+    private var baseTimeUs = C.TIME_UNSET
+
+    override fun getMatrix(presentationTimeUs: Long): Matrix {
+      if (baseTimeUs == C.TIME_UNSET) baseTimeUs = presentationTimeUs
+      val progress = if (rampDurationUs <= 0L) {
+        1f
+      } else {
+        ((presentationTimeUs - baseTimeUs).toFloat() / rampDurationUs).coerceIn(0f, 1f)
+      }
+      val scale = fromScale + (toScale - fromScale) * progress
+      return Matrix().apply { postScale(scale, scale) }
+    }
+  }
+
+  /**
+   * The dip that renders a crossfade: brightness falls to black across the last stretch of
+   * the outgoing item and rises across the first stretch of the incoming one. The cut itself
+   * stays on the exact frame the beat lands on.
+   */
+  private class AnimatedDip(
+    private val fadeInUs: Long,
+    private val fadeOutUs: Long,
+    private val itemDurationUs: Long,
+  ) : RgbMatrix {
+    private var baseTimeUs = C.TIME_UNSET
+
+    override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray {
+      if (baseTimeUs == C.TIME_UNSET) baseTimeUs = presentationTimeUs
+      val elapsedUs = presentationTimeUs - baseTimeUs
+      var factor = 1f
+      if (fadeInUs > 0L && elapsedUs < fadeInUs) {
+        factor = min(factor, (elapsedUs.toFloat() / fadeInUs).coerceIn(0f, 1f))
+      }
+      if (fadeOutUs > 0L && itemDurationUs > 0L) {
+        val fadeOutStartUs = itemDurationUs - fadeOutUs
+        if (elapsedUs >= fadeOutStartUs) {
+          val through = ((elapsedUs - fadeOutStartUs).toFloat() / fadeOutUs).coerceIn(0f, 1f)
+          factor = min(factor, 1f - through)
+        }
+      }
+      return floatArrayOf(
+        factor, 0f, 0f, 0f,
+        0f, factor, 0f, 0f,
+        0f, 0f, factor, 0f,
+        0f, 0f, 0f, 1f,
+      )
+    }
   }
 }

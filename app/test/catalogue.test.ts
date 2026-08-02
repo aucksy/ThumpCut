@@ -131,9 +131,14 @@ function catalogue(tracks: { id: string; hash: string }[], catalogueHash = "cat-
   };
 }
 
-function makeService(storage: MemoryStorage, network: FakeNetwork) {
+function makeService(
+  storage: MemoryStorage,
+  network: FakeNetwork,
+  bundled?: { catalogue: string; beatMaps: Record<string, string> },
+) {
   return new CatalogueService({
     catalogueUrl: URL_BASE,
+    bundled,
     storage,
     network,
     now: () => 1_000_000,
@@ -152,6 +157,91 @@ function stubHappyPath(network: FakeNetwork, tracks = [{ id: "t1", hash: "h1" }]
 }
 
 // ---------------------------------------------------------------------------
+
+describe("the catalogue compiled into the build", () => {
+  function bundle(tracks = [{ id: "t1", hash: "h1" }]) {
+    const beatMaps: Record<string, string> = {};
+    for (const track of tracks) {
+      beatMaps[track.id] = JSON.stringify(beatMap(track.id, track.hash));
+    }
+    return { catalogue: JSON.stringify(catalogue(tracks)), beatMaps };
+  }
+
+  it("serves a fresh offline install the whole catalogue, tracks and all", async () => {
+    const storage = new MemoryStorage();
+    const network = new FakeNetwork();
+    network.online = false;
+
+    const service = makeService(storage, network, bundle());
+    const snapshot = await service.load();
+
+    assert.equal(snapshot.state, "OfflineWithCache");
+    assert.equal(snapshot.message, null);
+    assert.equal(snapshot.catalogue?.tracks.length, 1);
+    // The seeded beat map serves without a single network call.
+    const servable = await service.servableTracks();
+    assert.equal(servable.length, 1);
+    assert.equal(network.calls.length, 0);
+  });
+
+  it("opens instantly online too, refreshing in the background instead of downloading", async () => {
+    const storage = new MemoryStorage();
+    const network = new FakeNetwork();
+    stubHappyPath(network);
+
+    const service = makeService(storage, network, bundle());
+    const snapshot = await service.load();
+
+    assert.equal(snapshot.state, "Ready");
+    assert.equal(snapshot.catalogue?.tracks.length, 1);
+  });
+
+  it("never overrides a real cache with the bundled copy", async () => {
+    const storage = new MemoryStorage();
+    const network = new FakeNetwork();
+    network.online = false;
+    storage.files.set(
+      "catalogue.json",
+      JSON.stringify(catalogue([{ id: "newer", hash: "h9" }], "cat-9")),
+    );
+
+    const service = makeService(storage, network, bundle());
+    const snapshot = await service.load();
+
+    assert.equal(snapshot.catalogue?.tracks[0]?.trackId, "newer");
+  });
+
+  it("treats a malformed bundle as no bundle at all", async () => {
+    const storage = new MemoryStorage();
+    const network = new FakeNetwork();
+    network.online = false;
+
+    const service = makeService(storage, network, {
+      catalogue: "{not json",
+      beatMaps: {},
+    });
+    const snapshot = await service.load();
+
+    assert.equal(snapshot.state, "OfflineNoCache");
+    assert.equal(snapshot.message, COPY.catalogue.offlineNoCache);
+  });
+
+  it("skips a bundled beat map whose hash does not match its track", async () => {
+    const storage = new MemoryStorage();
+    const network = new FakeNetwork();
+    network.online = false;
+
+    const wrongMap = { t1: JSON.stringify(beatMap("t1", "different-hash")) };
+    const service = makeService(storage, network, {
+      catalogue: JSON.stringify(catalogue([{ id: "t1", hash: "h1" }])),
+      beatMaps: wrongMap,
+    });
+    await service.load();
+
+    // The catalogue itself still serves; the mismatched map is simply not trusted.
+    assert.equal((await service.servableTracks()).length, 0);
+  });
+});
 
 describe("first launch", () => {
   it("downloads the catalogue when there is no cache and a connection", async () => {

@@ -45,6 +45,16 @@ export interface CatalogueServiceOptions {
    * is a working preview, so it is never treated as an error.
    */
   audioIndexUrl?: string;
+  /**
+   * The catalogue compiled into the app itself, when the build carries one.
+   *
+   * Every build is made from the same commit its catalogue is pinned to, so this copy is
+   * byte-identical to what the first network fetch would return. Seeding the cache from it
+   * means a fresh install works with no connection at all — the Your-music path needs
+   * nothing from the network — and the first launch opens instantly instead of downloading.
+   * Raw JSON strings, parsed with exactly the same validation as a download.
+   */
+  bundled?: { catalogue: string; beatMaps: Record<string, string> };
   storage: CatalogueStorage;
   network: CatalogueNetwork;
   /** Injected so tests are not at the mercy of the clock. */
@@ -55,6 +65,7 @@ export interface CatalogueServiceOptions {
 export class CatalogueService {
   private readonly url: string;
   private readonly audioUrl: string;
+  private readonly bundled: CatalogueServiceOptions["bundled"];
   private readonly storage: CatalogueStorage;
   private readonly network: CatalogueNetwork;
   private readonly now: () => number;
@@ -72,6 +83,7 @@ export class CatalogueService {
   constructor(options: CatalogueServiceOptions) {
     this.url = options.catalogueUrl.replace(/\/+$/, "");
     this.audioUrl = (options.audioIndexUrl ?? "").trim();
+    this.bundled = options.bundled;
     this.storage = options.storage;
     this.network = options.network;
     this.now = options.now ?? (() => Date.now());
@@ -96,7 +108,12 @@ export class CatalogueService {
     // network is still waking up already knows where its audio lives.
     this.audio = await this.readCachedAudioIndex();
 
-    const cached = await this.readCache();
+    let cached = await this.readCache();
+    if (!cached) {
+      // First run: seed the cache from the copy compiled into the app, so the gallery opens
+      // instantly and a phone with no connection still gets the whole product.
+      cached = await this.seedFromBundle();
+    }
     if (cached) {
       this.catalogue = cached;
       this.beatMaps.clear();
@@ -319,6 +336,34 @@ export class CatalogueService {
     }
 
     this.catalogue = catalogue;
+  }
+
+  /**
+   * Write the compiled-in catalogue and its beat maps to disk as though they had been
+   * downloaded — they are byte-identical to what the pinned URL serves, because the build
+   * and the catalogue come from the same commit. Anything malformed means no seed, and the
+   * launch flow continues exactly as it did before bundling existed.
+   */
+  private async seedFromBundle(): Promise<Catalogue | null> {
+    if (!this.bundled) return null;
+    try {
+      const catalogue = parseCatalogue(this.bundled.catalogue);
+      for (const track of catalogue.tracks) {
+        const raw = this.bundled.beatMaps[track.trackId];
+        if (!raw) continue;
+        const parsed = JSON.parse(raw) as BeatMap;
+        assertUsableBeatMap(parsed);
+        if (parsed.contentHash !== track.contentHash) continue;
+        await this.storage.writeTextAtomic(
+          `${BEATMAP_DIR}/${track.trackId}.json`,
+          JSON.stringify(parsed),
+        );
+      }
+      await this.storage.writeTextAtomic(CACHE_FILE, JSON.stringify(catalogue));
+      return catalogue;
+    } catch {
+      return null;
+    }
   }
 
   private async readCache(): Promise<Catalogue | null> {

@@ -59,6 +59,11 @@ export function RecommendedScreen({
         name={template.name}
         meta={formatTemplateMeta(bpmForTemplate?.(template) ?? 0, template.idealItemRange)}
         posterUri={template.previewPosterUrl || undefined}
+        poster={{
+          seed: template.id,
+          beatsPerSlide: template.density.medium,
+          transition: template.transition,
+        }}
         beats={HERO_RULER.beats}
         downbeats={HERO_RULER.downbeats}
         energy={HERO_RULER.energy}

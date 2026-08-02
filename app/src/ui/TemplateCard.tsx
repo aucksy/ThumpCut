@@ -18,12 +18,15 @@ import {
   space,
 } from "@thumpcut/design-tokens";
 import { BeatRuler, type RulerMarker } from "./BeatRuler.tsx";
+import { TemplatePoster, type TemplatePosterProps } from "./TemplatePoster.tsx";
 
 export interface TemplateCardProps {
   name: string;
   /** `128 BPM · 8–16 items`, already formatted. */
   meta: string;
   posterUri?: string;
+  /** Drawn when there is no poster art — the template's rhythm, generated from its id. */
+  poster?: Omit<TemplatePosterProps, "style" | "animated">;
   selected?: boolean;
   /** The compressed ruler along the bottom. */
   beats: number[];
@@ -42,6 +45,7 @@ export function TemplateCard({
   name,
   meta,
   posterUri,
+  poster,
   selected = false,
   beats,
   downbeats,
@@ -71,6 +75,13 @@ export function TemplateCard({
             contentFit="cover"
             accessible={false}
             transition={0}
+          />
+        ) : poster ? (
+          <TemplatePoster
+            seed={poster.seed}
+            beatsPerSlide={poster.beatsPerSlide}
+            transition={poster.transition}
+            style={StyleSheet.absoluteFill}
           />
         ) : null}
       </View>

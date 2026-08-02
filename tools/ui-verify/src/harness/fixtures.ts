@@ -58,7 +58,10 @@ export const SAMPLE_TEMPLATES: CatalogueTemplate[] = [
     name: "Night drive",
     mood: "Upbeat",
     previewVideoUrl: "",
-    previewPosterUrl: placeholder(3, 340, 500),
+    // The shipped catalogue has no poster art, so the screenshots must show what a phone
+    // shows: the generated rhythm poster. One template below keeps a poster to prove the
+    // art path still renders when art exists.
+    previewPosterUrl: "",
     idealItemRange: [8, 16],
     density: { low: 4, medium: 2, high: 1, drop: 1 },
     transition: "cut",
@@ -70,7 +73,7 @@ export const SAMPLE_TEMPLATES: CatalogueTemplate[] = [
     name: "Golden hour",
     mood: "Chill",
     previewVideoUrl: "",
-    previewPosterUrl: placeholder(7, 340, 500),
+    previewPosterUrl: "",
     idealItemRange: [6, 12],
     density: { low: 8, medium: 4, high: 2, drop: 2 },
     transition: "crossfade",
@@ -82,7 +85,7 @@ export const SAMPLE_TEMPLATES: CatalogueTemplate[] = [
     name: "Heat",
     mood: "Hype",
     previewVideoUrl: "",
-    previewPosterUrl: placeholder(11, 340, 500),
+    previewPosterUrl: "",
     idealItemRange: [10, 20],
     density: { low: 2, medium: 1, high: 1, drop: 1 },
     transition: "zoomPunch",
@@ -94,8 +97,8 @@ export const SAMPLE_TEMPLATES: CatalogueTemplate[] = [
     name: "Coastline",
     mood: "Cinematic",
     previewVideoUrl: "",
-    // Deliberately no poster: the "partially cached" state must show a panel, never an empty box.
-    previewPosterUrl: "",
+    // The one template WITH art, so a real poster arriving one day is proven to render.
+    previewPosterUrl: placeholder(11, 340, 500),
     idealItemRange: [8, 14],
     density: { low: 8, medium: 4, high: 2, drop: 2 },
     transition: "cut",
@@ -107,7 +110,7 @@ export const SAMPLE_TEMPLATES: CatalogueTemplate[] = [
     name: "Blackout",
     mood: "Hype",
     previewVideoUrl: "",
-    previewPosterUrl: placeholder(19, 340, 500),
+    previewPosterUrl: "",
     idealItemRange: [12, 24],
     density: { low: 2, medium: 1, high: 1, drop: 1 },
     transition: "cut",
