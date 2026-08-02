@@ -14,7 +14,7 @@ Last updated: 2026-08-02.
 | 06 Render | ☑ | ☑ | ☐ | Output validation is fully automated. Memory behaviour needs a phone. |
 | 07 Instagram handoff | ☑ | ☑ | ☐ | Blocked on a Meta app id. See OPEN-QUESTIONS. |
 | Design system | ☑ | ☑ 18 | ☐ | 40 screen states rendered, measured and screenshotted on every push. |
-| Cloud build | ☑ | — | — | GitHub Actions builds and publishes an installable APK on every push. |
+| Cloud build | ☑ | ☑ | ☑ | Green. A 44.8 MB signed APK is published and was opened and checked. |
 
 Totals: **474 automated checks** — 151 Python, 323 TypeScript — plus 4 UI gates over 120
 screen-state measurements.
@@ -30,6 +30,21 @@ screen-state measurements.
   so a new build installs over the old one.
 - The song list and beat maps live in `catalogue/` and are served by jsDelivr, pinned to the
   commit the APK was built from.
+
+### What was checked on the published file, not assumed
+
+The first green build was downloaded and opened rather than trusted:
+
+- 44.8 MB, and it carries an APK Signing Block, so Android will install it.
+- `assets/index.android.bundle` is inside it — the JavaScript is embedded and it runs with no
+  computer on the network.
+- `expo.modules.reelrender.ReelRenderModule` and
+  `expo.modules.instagramshare.InstagramShareModule` are both compiled in, along with Media3's
+  `Transformer` and `InAppMp4Muxer`. The app is not shipping without its renderer.
+- The compiled manifest carries the FileProvider and the Instagram `<queries>` entry.
+- The embedded config carries the jsDelivr catalogue URL pinned to the built commit, and an
+  empty Meta app id — so the Instagram button will correctly be absent.
+- `arm64-v8a` and `armeabi-v7a` only. No emulator architectures bloating the download.
 
 ## What can be trusted without a phone
 
