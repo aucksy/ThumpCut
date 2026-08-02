@@ -21,6 +21,7 @@
     "demo:serve": "node tools/sync-demo/serve.mjs",
     "prebuild:android": "npm run prebuild:android -w thumpcut-app",
     "factory": "python -m factory.run",
+    "check:meta": "python -m factory.check_meta",
     "factory:test": "python -m pytest factory/tests -q"
   },
   "//overrides": "expo-asset resolved to its SDK 57 build inside this SDK 55 app, and autolinking picked that copy to compile in. It loads the fonts and images during the first render, so the app died on launch with everything else looking perfectly healthy. `expo install --check` does not see this: it only inspects direct dependencies. `npm run check:native` does, and runs in CI.",

@@ -76,12 +76,46 @@ def _default_http_get(url: str) -> bytes:
     return body
 
 
-def build_trending_url(credentials: Credentials) -> str:
+def resolve_ig_user_id(token: str, http_get: HttpGetter | None = None) -> str:
+    """
+    Find the Instagram account behind a token.
+
+    So that setting this up needs **one** value pasted in, not two. The id is not something
+    anybody knows off the top of their head — it is looked up through the Facebook Page the
+    Instagram account is attached to, which is three clicks in a console most people see once.
+    The token already knows the answer; this just asks it.
+    """
+    getter = http_get or _default_http_get
+    query = urllib.parse.urlencode(
+        {"fields": "name,instagram_business_account", "access_token": token}
+    )
+    url = f"{META_GRAPH_HOST}/{META_GRAPH_VERSION}/me/accounts?{query}"
+    try:
+        payload = json.loads(getter(url).decode("utf-8"))
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+        raise DiscoveryFailed(f"could not look up the Instagram account: {exc}") from exc
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DiscoveryFailed(f"malformed answer looking up the Instagram account: {exc}") from exc
+
+    for page in payload.get("data", []):
+        linked = page.get("instagram_business_account") or {}
+        if linked.get("id"):
+            return str(linked["id"])
+
+    raise DiscoveryFailed(
+        "no Instagram account is connected to any of your Facebook Pages. On the phone: "
+        "Instagram > Settings > Account type and tools > switch to a professional account, "
+        "and connect a Facebook Page when it offers. Run 'python -m factory.check_meta' "
+        "for the full picture."
+    )
+
+
+def build_trending_url(credentials: Credentials, ig_user_id: str | None = None) -> str:
     """The exact trending endpoint. No search query — that is what returns trending."""
     query = urllib.parse.urlencode(
         {
             "audio_type": "music",
-            "user_id": credentials.ig_user_id,
+            "user_id": ig_user_id or credentials.ig_user_id,
             "access_token": credentials.meta_access_token,
             "fields": "id,title,display_artist,duration_in_ms,download_url",
         }
@@ -127,7 +161,11 @@ def parse_track_list(payload: dict[str, Any]) -> list[DiscoveredTrack]:
 def discover_live(credentials: Credentials, http_get: HttpGetter | None = None) -> list[DiscoveredTrack]:
     """Fetch the trending list from Meta. Raises TokenRejected or DiscoveryFailed."""
     getter = http_get or _default_http_get
-    url = build_trending_url(credentials)
+    # One value to paste in, not two: the token can be asked which Instagram account it is for.
+    ig_user_id = credentials.ig_user_id or resolve_ig_user_id(
+        credentials.meta_access_token, http_get
+    )
+    url = build_trending_url(credentials, ig_user_id)
     try:
         body = getter(url)
     except urllib.error.HTTPError as exc:

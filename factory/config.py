@@ -78,8 +78,14 @@ class Credentials:
 
     @property
     def has_meta(self) -> bool:
-        """True when a live Meta call is possible."""
-        return bool(self.meta_access_token and self.ig_user_id)
+        """
+        True when a live Meta call is possible.
+
+        The Instagram user id is deliberately not required: it can be looked up from the token
+        itself, and asking somebody to find it by hand is three clicks in a console they will
+        see once and an id nobody remembers. One secret, not two.
+        """
+        return bool(self.meta_access_token)
 
     @property
     def has_r2(self) -> bool:
