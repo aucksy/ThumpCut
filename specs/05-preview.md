@@ -15,7 +15,24 @@ beat ruler, template switching, shuffle.
 
 **Out of scope:** export (Phase 6), reordering media (Phase 4), editing the beat grid.
 
-### 1.1 Preview audio — BUILD MODE A, DO NOT ASK
+### 1.1 Preview audio — SUPERSEDED 2026-08-02: BUILD MODE B
+
+> **Owner decision, 2026-08-02. This overrides everything below it.**
+>
+> **The preview must play the real track. Mode A is not sufficient and is not the target.**
+> The benchmark named by the owner is the Play Store app *Beats — Reel Maker for Instagram
+> Beat*, which plays the actual music while previewing. ThumpCut is to do the same, and §1 of
+> this spec always said so: *"play a live preview with the track streaming."*
+>
+> Mode A shipped as a way to unblock this phase without waiting on a terms answer. That was a
+> scheduling call, not the design, and it has been read twice since as though the silent
+> preview were the intent. It is not. **Build Mode B.**
+>
+> Mode A stays in the codebase as the fallback for when audio cannot be fetched — a device
+> offline, a URL expired, a track withdrawn. It is what the user gets *instead* of silence,
+> never what they get by default.
+
+**Original text, kept for the reasoning only:**
 
 There is an unresolved legal question about whether Meta's terms permit proxying their
 `download_url` for playback in a third-party app. **That question does not block this phase.**
