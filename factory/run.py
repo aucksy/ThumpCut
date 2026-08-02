@@ -42,6 +42,7 @@ from factory.publish import (
     PublishFailed,
     load_templates,
     upload_to_r2,
+    write_audio_index_only,
     write_local,
 )
 from factory.schema import BeatMap
@@ -137,6 +138,73 @@ def _fingerprint_track(track: DiscoveredTrack, tmp_dir: Path) -> str:
         return fingerprint_audio(audio)
     finally:
         audio_path.unlink(missing_ok=True)
+
+
+def refresh_links(
+    credentials: Credentials | None = None,
+    out_dir: Path | None = None,
+) -> RunReport:
+    """
+    Republish only the audio links, for the timer. **No audio is fetched.**
+
+    The preview plays the real recording from a link that expires in about a day and a half,
+    which is far sooner than anybody pushes code — so something has to republish those links
+    on a clock. A full run would download and fingerprint every track to do it, which against
+    a few hundred tracks, four times a day, is a great deal of somebody else's bandwidth for
+    an answer that changes very rarely. Discovery alone already carries fresh links.
+
+    Everything else is left exactly as the last full run left it, so this can never retire a
+    track, change a beat grid, or publish a catalogue.
+    """
+    creds = credentials if credentials is not None else load_credentials()
+    destination = out_dir or OUT_DIR
+    report = RunReport()
+
+    try:
+        discovered, used_fixtures = discover(creds)
+        report.used_fixtures = used_fixtures
+    except TokenRejected as exc:
+        _log(str(exc))
+        report.aborted = True
+        report.abort_reason = str(exc)
+        return report
+    except DiscoveryFailed as exc:
+        # The previous links stay published. Some of them may already be dead, and the app
+        # checks every expiry before it plays anything, so the cost is a click, not a fault.
+        _log(f"DISCOVERY_FAIL: {exc}. Keeping the previous audio links.")
+        return report
+
+    previous = load_previous_beat_maps(destination)
+    if not previous:
+        _log("NO_CATALOGUE: nothing published yet. Run the Factory properly first.")
+        return report
+
+    audio_sources = {
+        track.audio_id: track.download_url
+        for track in discovered
+        if track.download_url and track.audio_id in previous
+    }
+    beat_maps = [previous[track_id] for track_id in sorted(audio_sources)]
+
+    if not beat_maps:
+        _log("WARNING: none of the published tracks came back from discovery. Links kept.")
+        return report
+
+    try:
+        _, index = write_audio_index_only(beat_maps, audio_sources, destination)
+    except PublishFailed as exc:
+        _log(f"PUBLISH_FAIL {exc}")
+        report.aborted = True
+        report.abort_reason = str(exc)
+        return report
+
+    report.published = sorted(previous)
+    report.playable = len(index["audio"])
+    _log(
+        f"AUDIO_LINKS {report.playable} of {len(previous)} published tracks have a fresh link. "
+        f"No audio was fetched."
+    )
+    return report
 
 
 def run_factory(
@@ -337,7 +405,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-upload", action="store_true", help="write locally, never upload to R2"
     )
+    parser.add_argument(
+        "--links-only",
+        action="store_true",
+        help="republish only the preview's audio links; fetch no audio and touch no beat map",
+    )
     arguments = parser.parse_args(argv)
+
+    if arguments.links_only:
+        return refresh_links(out_dir=arguments.out).exit_code
 
     report = run_factory(
         out_dir=arguments.out,

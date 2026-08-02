@@ -243,6 +243,33 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
         raise PublishFailed(f"could not write {path}: {exc}") from exc
 
 
+def write_audio_index_only(
+    beat_maps: list[BeatMap],
+    audio_sources: dict[str, str],
+    out_dir: Path | None = None,
+    now: datetime | None = None,
+) -> tuple[Path, dict[str, Any]]:
+    """
+    Republish just the links, leaving the catalogue and every beat map exactly as they are.
+
+    This is what the six-hourly timer runs. A full run downloads and fingerprints every
+    track's audio to check Instagram has not swapped a recording — worth doing, but not four
+    times a day against a few hundred tracks, and the only thing that actually goes stale that
+    fast is the links themselves. Discovery alone returns fresh ones, so this fetches no audio
+    at all and invariant P1 is satisfied by there being nothing to delete.
+    """
+    if not beat_maps:
+        raise PublishFailed("refusing to publish an empty audio index")
+
+    destination = out_dir or OUT_DIR
+    destination.mkdir(parents=True, exist_ok=True)
+
+    index = build_audio_index(beat_maps, audio_sources, now)
+    index = _carry_over_generated_at(index, destination / AUDIO_INDEX_FILENAME, "indexHash")
+    _write_json(destination / AUDIO_INDEX_FILENAME, index)
+    return destination, index
+
+
 def _carry_over_generated_at(
     payload: dict[str, Any],
     live_file: Path,

@@ -370,3 +370,23 @@ def test_a_changed_run_does_move_the_timestamp(tmp_path: Path) -> None:
                 audio_sources={"a": "fixture://drive-124.wav"})
     payload = json.loads((tmp_path / AUDIO_INDEX_FILENAME).read_text(encoding="utf-8"))
     assert payload["generatedAt"] == "2026-08-03T12:00:00Z"
+
+
+def test_a_links_only_publish_leaves_the_catalogue_and_beat_maps_alone(tmp_path: Path) -> None:
+    """The timed run refreshes links and nothing else. It cannot retire a track by accident."""
+    from factory.publish import write_audio_index_only
+
+    write_local([beat_map_for("a")], load_templates(), tmp_path, MOMENT,
+                audio_sources={"a": "https://scontent.example/a.m4a?oe=6A8227A0"})
+    catalogue_before = (tmp_path / CATALOGUE_FILENAME).read_bytes()
+    beat_map_before = (tmp_path / BEATMAP_DIRNAME / "a.json").read_bytes()
+
+    later = datetime(2026, 8, 2, 12, 0, 0, tzinfo=timezone.utc)
+    write_audio_index_only(
+        [beat_map_for("a")], {"a": "https://scontent.example/a.m4a?oe=6A8227A0&sig=new"}, tmp_path, later
+    )
+
+    assert (tmp_path / CATALOGUE_FILENAME).read_bytes() == catalogue_before
+    assert (tmp_path / BEATMAP_DIRNAME / "a.json").read_bytes() == beat_map_before
+    payload = json.loads((tmp_path / AUDIO_INDEX_FILENAME).read_text(encoding="utf-8"))
+    assert payload["audio"]["a"]["url"].endswith("sig=new")

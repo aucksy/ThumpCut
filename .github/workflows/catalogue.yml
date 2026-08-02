@@ -24,9 +24,10 @@ on:
       - ".github/workflows/catalogue.yml"
   schedule:
     # Every six hours, for one reason: the preview plays the real track, and Instagram's audio
-    # links expire in about a day and a half. This is what keeps a fresh one published. With no
-    # META_ACCESS_TOKEN it produces the same three test tracks it always does, notices nothing
-    # changed, and commits nothing — see `_carry_over_generated_at` in factory/publish.py.
+    # links expire in about a day and a half. A timed run refreshes the links **only** — it
+    # fetches no audio, touches no beat map and cannot retire a track. With no
+    # META_ACCESS_TOKEN it produces the same three test-track links it always does, notices
+    # nothing changed, and commits nothing.
     - cron: "0 */6 * * *"
   workflow_dispatch:
 
@@ -60,12 +61,28 @@ jobs:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
         run: python -m factory.check_meta
 
-      - name: Run the Factory
+      - name: Refresh the preview's audio links
+        # The timed run, and all it does. No audio is fetched, no beat map is touched, and
+        # nothing can be retired — the links are the only thing that goes stale in six hours.
+        if: github.event_name == 'schedule'
         env:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
-          rm -rf catalogue
+          python -m factory.run --links-only --out catalogue
+
+      - name: Run the Factory
+        if: github.event_name != 'schedule'
+        env:
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The previous catalogue is deliberately left in place rather than deleted first.
+          # Two things depend on it: the Factory re-verifies a recording against the beat map
+          # it already has instead of re-analysing every track from scratch, and it can leave
+          # `generatedAt` alone when the content is identical — which is what stops a run that
+          # changed nothing from committing. Retiring a track is handled by the publish step,
+          # which swaps a whole new beat map directory into place, so nothing stale survives.
           python -m factory.run --no-upload --out catalogue --tmp "$RUNNER_TEMP/tmp"
           # P1 — no audio may survive a run.
           test -z "$(ls -A "$RUNNER_TEMP/tmp" 2>/dev/null)" || (echo "audio left on disk" && exit 1)
