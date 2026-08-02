@@ -16,6 +16,10 @@ REPO_ROOT = FACTORY_DIR.parent
 TMP_DIR = FACTORY_DIR / "tmp"
 OUT_DIR = FACTORY_DIR / "out"
 FIXTURES_DIR = FACTORY_DIR / "fixtures"
+# Where the owner drops his own music to hear the cuts against it. Gitignored, so nothing
+# commercial ever reaches the repository, and absent in CI — which is what keeps a locally
+# analysed track from ever reaching the published catalogue.
+LOCAL_DIR = FACTORY_DIR / "local"
 
 CATALOGUE_FILENAME = "catalogue.json"
 BEATMAP_DIRNAME = "beatmaps"

@@ -12,8 +12,9 @@ Everything here happens on your phone. Your laptop is not involved at any point.
 
    **https://github.com/aucksy/ThumpCut/releases/latest**
 
-2. Scroll down to the grey **Assets** box. Tap **ThumpCut.apk**.
-   It downloads. It is roughly the size of a couple of photos.
+2. Scroll down to the grey **Assets** box and tap the file ending **`.apk`**. It is named with
+   its version and build number — `ThumpCut-1.0.0-b17.apk` — so you can always tell which one
+   you are holding. It downloads in a few seconds.
 
 3. Tap the download when it finishes (or open Chrome's **Downloads** and tap it there).
 
@@ -29,10 +30,15 @@ plain white Android robot instead, tell me: the build picked up the wrong icon.*
 
 ### Every time after that
 
-Same link, same three taps: **Assets → ThumpCut.apk → Install**. It installs straight over
-the old one — you do not need to uninstall first, and nothing you selected is lost.
+Same link, same three taps: **Assets → the `.apk` file → Install**. It installs straight over
+the old one — you never need to uninstall, and nothing is lost. Every build is signed with the
+same key, which is what makes that possible; if Android ever refuses an update, that is a bug
+and I want to hear about it.
 
 That link always points at the newest build. There is nothing to check or choose.
+
+**To see which build you are running:** Settings → Apps → ThumpCut. The version there matches
+the number in the file name.
 
 ### If the page says "Release not found"
 

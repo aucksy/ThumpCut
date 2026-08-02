@@ -29,6 +29,7 @@ from factory.discover import (
     DiscoveryFailed,
     TokenRejected,
     discover,
+    discover_local,
 )
 from factory.engines import DEFAULT_ENGINE_NAME, get_engine
 from factory.engines.base import BeatEngineUnavailable
@@ -145,7 +146,13 @@ def run_factory(
         return report
     report.engine_name = engine.name
 
-    if not creds.has_meta:
+    local_tracks = discover_local()
+    if local_tracks:
+        _log(
+            f"LOCAL_AUDIO: analysing {len(local_tracks)} track(s) from factory/local. "
+            "For hearing the cuts against your own music — never published."
+        )
+    elif not creds.has_meta:
         _log("NO_CREDENTIALS: running in fixture mode. Set META_ACCESS_TOKEN for live data.")
         report.used_fixtures = True
 

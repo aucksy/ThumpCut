@@ -17,6 +17,8 @@
     "verify": "npm run check:native && npm run typecheck && npm test && npm run verify:ui",
     "check:native": "node tools/check-native-versions.mjs",
     "icons": "node tools/icons/make-icons.mjs",
+    "demo": "node --experimental-strip-types tools/sync-demo/make-demo.mjs",
+    "demo:serve": "node tools/sync-demo/serve.mjs",
     "prebuild:android": "npm run prebuild:android -w thumpcut-app",
     "factory": "python -m factory.run",
     "factory:test": "python -m pytest factory/tests -q"

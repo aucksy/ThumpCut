@@ -51,7 +51,9 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.thumpcut.app",
-    versionCode: 1,
+    // Every cloud build gets its own number, so Android treats a new one as an upgrade rather
+    // than a sideways reinstall, and so the build a tester is holding can be identified.
+    versionCode: Number(process.env.THUMPCUT_BUILD ?? "1"),
     permissions: [
       "android.permission.READ_MEDIA_IMAGES",
       "android.permission.READ_MEDIA_VIDEO",

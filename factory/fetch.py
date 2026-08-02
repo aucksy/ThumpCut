@@ -25,6 +25,7 @@ from factory.config import (
 from factory.discover import DiscoveredTrack
 
 FIXTURE_SCHEME = "fixture://"
+LOCAL_SCHEME = "local://"
 _ALLOWED_LIVE_PREFIXES = ("https://",)
 
 
@@ -51,11 +52,18 @@ def _default_download(url: str, destination: Path) -> None:
 def assert_permitted_source(url: str) -> None:
     """Invariant P8, asserted rather than assumed.
 
-    Beat maps are only ever computed from a Meta ``download_url``. A local fixture path is
-    the one other accepted case, and it is explicitly scheme-tagged so it cannot be confused
-    with a real URL.
+    Beat maps are only ever computed from a Meta ``download_url``. Two local cases are
+    accepted, both explicitly scheme-tagged so neither can be confused with a real URL:
+
+    * ``fixture://`` — the synthesised test tracks, which are ours.
+    * ``local://`` — audio the owner has dropped in ``factory/local`` to watch the cuts
+      against music he knows. **Never for the published catalogue.** A beat grid computed
+      from a different copy of a recording than the one Instagram attaches will drift, which
+      is the whole reason this invariant exists. What keeps the two apart is not a promise:
+      the folder is gitignored and does not exist on the machine that publishes, so a locally
+      analysed track has no route to a phone.
     """
-    if url.startswith(FIXTURE_SCHEME):
+    if url.startswith(FIXTURE_SCHEME) or url.startswith(LOCAL_SCHEME):
         return
     if not any(url.startswith(prefix) for prefix in _ALLOWED_LIVE_PREFIXES):
         raise ForbiddenAudioSource(

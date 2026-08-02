@@ -15,6 +15,7 @@ is ever blocked on API access.
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,6 +26,7 @@ from typing import Any, Callable
 from factory.config import (
     FETCH_TIMEOUT_SECONDS,
     FIXTURES_DIR,
+    LOCAL_DIR,
     META_AUDIO_PATH,
     META_GRAPH_HOST,
     META_GRAPH_VERSION,
@@ -185,12 +187,60 @@ def discover_fixtures(fixtures_dir: Path | None = None) -> list[DiscoveredTrack]
     return tracks
 
 
+AUDIO_SUFFIXES = (".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus")
+
+
+def discover_local(local_dir: Path | None = None) -> list[DiscoveredTrack]:
+    """
+    The owner's own music, dropped in ``factory/local``.
+
+    For hearing the cuts against a track he knows — never for the published catalogue; see
+    ``assert_permitted_source``. Title and artist are read from the file name when it is
+    written ``Artist - Title.mp3``, because that is how downloads are usually named, and
+    otherwise the whole file name becomes the title.
+    """
+    directory = local_dir or LOCAL_DIR
+    if not directory.is_dir():
+        return []
+
+    tracks: list[DiscoveredTrack] = []
+    for path in sorted(directory.iterdir()):
+        if not path.is_file() or path.suffix.lower() not in AUDIO_SUFFIXES:
+            continue
+
+        stem = path.stem.strip()
+        if " - " in stem:
+            artist, _, title = stem.partition(" - ")
+        else:
+            artist, title = "Local", stem
+
+        slug = re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-") or "local-track"
+        tracks.append(
+            DiscoveredTrack(
+                audio_id=f"local-{slug}",
+                title=title.strip(),
+                artist=artist.strip(),
+                # Read from the file itself during analysis; nothing here is trusted.
+                duration_ms=0,
+                download_url=f"local://{path.name}",
+                local_path=path,
+            )
+        )
+    return tracks
+
+
 def discover(
     credentials: Credentials,
     http_get: HttpGetter | None = None,
     fixtures_dir: Path | None = None,
+    local_dir: Path | None = None,
 ) -> tuple[list[DiscoveredTrack], bool]:
     """Return (tracks, used_fixtures). Never raises for missing credentials."""
+    # Anything in the local folder wins. It is only ever there because somebody put it there
+    # deliberately, and silently ignoring it in favour of the test kit would be baffling.
+    local = discover_local(local_dir)
+    if local:
+        return local, True
     if not credentials.has_meta:
         return discover_fixtures(fixtures_dir), True
     return discover_live(credentials, http_get), False

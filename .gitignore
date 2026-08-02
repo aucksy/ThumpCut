@@ -3,6 +3,10 @@ node_modules/
 .env.local
 factory/tmp/
 factory/out/
+# The owner's own music, for hearing the cuts against a track he knows. Never committed —
+# the README that explains the folder is, so the folder exists in a fresh clone.
+factory/local/*
+!factory/local/README.md
 dist/
 build/
 *.log

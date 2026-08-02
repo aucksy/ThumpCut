@@ -68,6 +68,14 @@ jobs:
         # no APK at all — it costs somebody a download, an install and their patience.
         run: npm run check:native
 
+      - name: Number this build
+        run: |
+          version=$(node -p "require('./app/package.json').version || '1.0.0'")
+          echo "THUMPCUT_BUILD=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "APK_NAME=ThumpCut-${version}-b${GITHUB_RUN_NUMBER}.apk" >> "$GITHUB_ENV"
+          echo "APP_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "This is build ${GITHUB_RUN_NUMBER} of ${version}"
+
       - name: Point the app at this commit's catalogue
         # Pinned to the commit rather than to the branch: a CDN caches a branch for hours, and
         # a phone fetching yesterday's song list against today's app is a bug nobody can see.
@@ -79,6 +87,16 @@ jobs:
 
       - name: Generate the native Android project
         run: npm run prebuild:android
+
+      - name: Sign with the pinned test key
+        # Prebuild writes a fresh debug keystore every time. Today it copies a fixed file out
+        # of the Expo template, so the key happens to be stable — but that is Expo's packaging
+        # detail, not a promise. Android refuses to install a build over one signed by a
+        # different key, so the day that template changes, every tester is told to uninstall.
+        # Pinning it here means that cannot happen. See ci/README.md.
+        run: |
+          cp ci/thumpcut-test.keystore app/android/app/debug.keystore
+          echo "Signing key pinned: $(sha256sum app/android/app/debug.keystore | cut -c1-16)…"
 
       - name: Give Gradle enough heap for a release build
         # The template ships 2GB, which is fine on a workstation and marginal here. Last
@@ -126,16 +144,16 @@ jobs:
             exit 1
           fi
           mkdir -p out
-          cp "$built" out/ThumpCut.apk
-          size=$(du -h out/ThumpCut.apk | cut -f1)
+          cp "$built" "out/${APK_NAME}"
+          size=$(du -h "out/${APK_NAME}" | cut -f1)
           echo "size=$size" >> "$GITHUB_OUTPUT"
-          echo "Built ThumpCut.apk ($size)"
+          echo "Built ${APK_NAME} ($size)"
 
       - name: Keep a copy against this run
         uses: actions/upload-artifact@v4
         with:
           name: ThumpCut-apk
-          path: out/ThumpCut.apk
+          path: out/*.apk
           retention-days: 30
 
       - name: Publish it where a phone can reach it
@@ -144,21 +162,23 @@ jobs:
         run: |
           set -euo pipefail
           notes=$(cat <<NOTES
-          **Tap \`ThumpCut.apk\` below on your phone to install it.**
+          **Tap \`${APK_NAME}\` below on your phone to install it.**
 
-          Built from \`${GITHUB_SHA:0:7}\` — $(git log -1 --pretty=%s)
+          Version ${APP_VERSION}, build ${GITHUB_RUN_NUMBER} — ${{ steps.collect.outputs.size }}
+          From \`${GITHUB_SHA:0:7}\`: $(git log -1 --pretty=%s)
 
-          Size: ${{ steps.collect.outputs.size }}
+          Signed with the project's fixed test key, so it installs straight over whatever
+          build you already have — no uninstall, nothing lost. Android will warn you it is
+          from an unknown developer; that is expected for anything not from the Play Store.
 
-          This is a test build signed with a test key. Android will warn you that it is from
-          an unknown developer; that is expected. It installs over any earlier ThumpCut
-          without uninstalling first.
+          To check which build you are running: **Settings → Apps → ThumpCut**, and look at
+          the version.
           NOTES
           )
           # Replaced rather than added to, so the download link is always the newest build.
           gh release delete "$RELEASE_TAG" --yes --cleanup-tag || true
-          gh release create "$RELEASE_TAG" out/ThumpCut.apk \
+          gh release create "$RELEASE_TAG" "out/${APK_NAME}" \
             --target "$GITHUB_SHA" \
-            --title "ThumpCut — latest Android build" \
+            --title "ThumpCut ${APP_VERSION} — build ${GITHUB_RUN_NUMBER}" \
             --notes "$notes" \
             --latest
