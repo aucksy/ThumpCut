@@ -62,6 +62,12 @@ jobs:
       - name: Install
         run: npm ci --no-audit --no-fund
 
+      - name: Every linked native module is on this SDK
+        # Before anything is built, not just alongside it. A package from another SDK compiles
+        # perfectly and then kills the app on launch, and an APK that cannot open is worse than
+        # no APK at all — it costs somebody a download, an install and their patience.
+        run: npm run check:native
+
       - name: Point the app at this commit's catalogue
         # Pinned to the commit rather than to the branch: a CDN caches a branch for hours, and
         # a phone fetching yesterday's song list against today's app is a bug nobody can see.

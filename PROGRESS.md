@@ -60,6 +60,32 @@ The first green build was downloaded and opened rather than trusted:
 - The export validator rejects an edit list, a variable frame rate, an audio track, the wrong
   size, the wrong length, and a moov atom in the wrong place.
 
+## The first build did not launch
+
+It closed on opening. `expo-audio` declares a wildcard peer dependency on `expo-asset`, so npm
+installed the **SDK 57** build of it into this SDK 55 app, hoisted it above the correct copy,
+and Expo's autolinker compiled that one in. `expo-asset` loads the typefaces during the first
+render, so it failed at the earliest possible moment.
+
+Nothing caught it. The build was green, the types passed, 306 tests passed, forty screens
+rendered and measured cleanly, and `npx expo install --check` was satisfied — it inspects what
+`package.json` asks for, not what the tree resolved to underneath it.
+
+Three things changed as a result:
+
+1. The package is pinned to the SDK's own version, and `npm run check:native` asks the
+   autolinker *which copy it is about to compile* and fails on anything off-SDK. It runs before
+   the APK is built as well as in Verify, so a bad tree cannot produce an installable file.
+2. Font loading can no longer stall the app indefinitely. After four seconds it starts in
+   whatever face the phone has. A missing typeface is cosmetic; a screen that never appears
+   is not.
+3. Anything else that throws on startup now stops on a screen that prints what broke, large
+   enough to photograph, rather than closing. Reading Android's own crash log needs a laptop
+   and a cable, which is the one thing this project does not have.
+
+**Still unproven.** A fix for a crash nobody could reproduce off-device is a hypothesis with
+good evidence behind it, not a result. Only the phone settles it.
+
 ## Known gaps in the renderer
 
 Both are in the native Android module, both are invisible to every check that can run without a
