@@ -42,6 +42,18 @@ jobs:
   publish:
     name: Regenerate and commit it
     runs-on: ubuntu-latest
+    # Secrets land in the job's environment once, and every step — including step `if`
+    # conditions — reads `env`, never `secrets`. GitHub's expression parser does not allow
+    # the secrets context inside a step-level `if`; a workflow that tries is refused at
+    # parse time, before any job exists, and the failure is only visible as an "Invalid
+    # workflow file" annotation nobody is looking for. That exact mistake silently stopped
+    # every catalogue run between 09:48 and 12:42 UTC on 2026-08-02.
+    env:
+      META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+      # One free key from devportal.jamendo.com switches the royalty-free section on. Its
+      # links never expire, but the audio index is rebuilt whole, so the section has to be
+      # present in every refresh or its entries would silently vanish.
+      JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,31 +68,19 @@ jobs:
         # So a token problem reads as "switch the Instagram account to Professional" rather
         # than as a stack trace three steps later. Skipped entirely when there is no token —
         # fixture mode is a valid way to run.
-        if: ${{ secrets.META_ACCESS_TOKEN != '' }}
-        env:
-          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+        if: ${{ env.META_ACCESS_TOKEN != '' }}
         run: python -m factory.check_meta
 
       - name: Refresh the preview's audio links
         # The timed run, and all it does. No audio is fetched, no beat map is touched, and
         # nothing can be retired — the links are the only thing that goes stale in six hours.
         if: github.event_name == 'schedule'
-        env:
-          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-          # The royalty-free section (Jamendo). Its links never expire, but the index is
-          # rebuilt whole, so the section has to be present in every refresh or its entries
-          # would silently vanish.
-          JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
         run: |
           set -euo pipefail
           python -m factory.run --links-only --out catalogue
 
       - name: Run the Factory
         if: github.event_name != 'schedule'
-        env:
-          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-          # One free key from devportal.jamendo.com switches the royalty-free section on.
-          JAMENDO_CLIENT_ID: ${{ secrets.JAMENDO_CLIENT_ID }}
         run: |
           set -euo pipefail
           # The previous catalogue is deliberately left in place rather than deleted first.

@@ -25,17 +25,25 @@ const FIXTURES = [
 
 const BEAT_PARITY_SEC = 0.012;
 
-function fixturePath(relative: string): string {
-  return fileURLToPath(new URL(`../../../factory/${relative}`, import.meta.url));
+function repoPath(relative: string): string {
+  return fileURLToPath(new URL(`../../../${relative}`, import.meta.url));
 }
 
+/**
+ * The reference answers are the *published* beat maps in `catalogue/` — committed, served
+ * to phones, and identical to what the Python engine produced. `factory/out/` holds the
+ * same content but is gitignored scratch, which is exactly why it must not be read here:
+ * it exists on a machine that has run the Factory and nowhere else, CI included.
+ */
 function loadReference(name: string): BeatMap {
-  return JSON.parse(readFileSync(fixturePath(`out/beatmaps/${name}`), "utf8")) as BeatMap;
+  return JSON.parse(readFileSync(repoPath(`catalogue/beatmaps/${name}`), "utf8")) as BeatMap;
 }
 
 for (const fixture of FIXTURES) {
   test(`agrees with the Python engine on ${fixture.wav}`, async () => {
-    const wav = decodeWav(new Uint8Array(readFileSync(fixturePath(`fixtures/${fixture.wav}`))));
+    const wav = decodeWav(
+      new Uint8Array(readFileSync(repoPath(`factory/fixtures/${fixture.wav}`))),
+    );
     const samples = resampleLinear(wav.samples, wav.sampleRate, 22050);
     const reference = loadReference(fixture.beatMap);
 
