@@ -94,6 +94,17 @@ export function ShareScreen({
           </View>
 
           <View style={styles.actions}>
+            {/*
+              Above the buttons in the layout, not floating over them at a fixed distance from
+              the bottom of the screen. This block is a different height depending on whether
+              the Instagram button is there at all, and the fixed offset put "Saved to your
+              gallery." straight across the middle of it.
+            */}
+            {snapshot.message && !fileGone ? (
+              <View style={styles.toastRow} pointerEvents="none">
+                <Toast>{snapshot.message}</Toast>
+              </View>
+            ) : null}
             {snapshot.instagramAvailable ? (
               <Button full onPress={onShare} testID="share-instagram">
                 {COPY.share.shareToInstagram}
@@ -114,11 +125,6 @@ export function ShareScreen({
         </>
       )}
 
-      {snapshot.message && !fileGone ? (
-        <View style={styles.toastRow} pointerEvents="none">
-          <Toast>{snapshot.message}</Toast>
-        </View>
-      ) : null}
     </Screen>
   );
 }
@@ -142,11 +148,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.s3,
     paddingTop: space.s2,
   },
-  toastRow: {
-    position: "absolute",
-    left: layout.screenPad,
-    right: layout.screenPad,
-    bottom: 228,
-    alignItems: "center",
-  },
+  toastRow: { alignItems: "center", paddingBottom: space.s2 },
 });

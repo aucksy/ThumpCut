@@ -36,7 +36,7 @@ That link always points at the newest build. There is nothing to check or choose
 
 ### If the page says "Release not found"
 
-The build has not finished yet. It takes about fifteen minutes after a change. Go to
+The build has not finished yet. It takes about twenty minutes after a change. Go to
 **https://github.com/aucksy/ThumpCut/actions**, and look at the top row: a spinning brown dot
 means it is still building, a green tick means it is ready, a red cross means it failed — send
 me a screenshot of the red one.
@@ -154,28 +154,49 @@ is no broken file in your gallery.
 **Turn "Don't keep activities" back off when you are finished.** Leaving it on makes every app
 on the phone behave badly.
 
-### Only if you have an iPhone to hand
+### Not yet — here so they are not forgotten
 
-There is no iPhone build yet — this build is Android only. Skip 14–16 for now; I have noted
-them so they are not forgotten.
+**14–18. Everything to do with Instagram.** The button is deliberately hidden until I have the
+Meta app ID from you (see below). Once I have it these become: the button appears, sharing
+opens Instagram with the reel loaded, cancelling inside Instagram and coming back keeps
+everything, uninstalling Instagram makes the button vanish, and the cuts still land on the beat
+once a real track is applied. That last one is the one that proves the whole product works, and
+it also needs real songs rather than the three test tracks.
 
-**14.** Limited photo access shows only the photos you picked, plus a way to pick more.
-**15.** An iCloud photo that has not downloaded either downloads or is skipped with a clear
-message.
-**16.** The Instagram button appears at all.
+**19–20. The iPhone ones.** There is no iPhone build yet — this is Android only. Limited photo
+access, and an iCloud photo that has not downloaded.
 
 ---
 
 ## Part 4 — What I need from you to finish this
 
-Three things, and only one of them is urgent.
+Three things, and only the first is urgent.
 
-1. **A Meta app ID** — a number from Meta's developer site. Without it the Instagram button
-   cannot exist, and sharing to Reels is the whole point of the product. This is the one that
-   matters.
-2. **Real songs** — a decision on whether we use Instagram's real music library, which needs a
-   Meta access token. Until then the three test tracks stand in.
-3. **Template preview videos** — five short looping clips, one per style, or a decision to
-   ship with still panels. Purely cosmetic; the app works either way.
+### 1. A Meta app ID — the one that matters
 
-Send me the first one and the Instagram half of this product comes alive.
+Without it the Instagram button cannot exist, and sharing to Reels is the whole point of the
+product. It is free, there is no review and no approval.
+
+- Go to **https://developers.facebook.com/apps** and sign in.
+- **Create app** → give it any name → choose **Other** → **Business** → create.
+- On the dashboard, copy the **App ID**. It is a long number.
+
+Then put it into the build — you do not need to send it to me, and it is better if you don't:
+
+- Go to **https://github.com/aucksy/ThumpCut/settings/secrets/actions**
+- **New repository secret**
+- Name: `META_APP_ID` (exactly that, capitals and underscore)
+- Secret: paste the number → **Add secret**
+
+The next build picks it up on its own. Nothing else changes.
+
+### 2. Real songs, instead of the three test tracks
+
+Same idea: a **Meta access token**, added as a secret named `META_ACCESS_TOKEN`. Once it is
+there, the song list rebuilds itself from Instagram's real music library and the app starts
+offering real tracks. Until then the test kit stands in and every timing test still counts.
+
+### 3. Template preview videos
+
+Five short looping clips, one per style — or just tell me to ship the still panels. Purely
+cosmetic; the app works either way. This one can wait indefinitely.
