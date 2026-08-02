@@ -15,6 +15,10 @@ name: Android APK
 on:
   push:
     branches: [main]
+    paths-ignore:
+      # Prose cannot change the app. A push that only edits documentation used to cost a
+      # twenty-minute build and replace the release the owner was in the middle of installing.
+      - "**/*.md"
   workflow_dispatch:
 
 permissions:
