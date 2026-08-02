@@ -75,8 +75,14 @@ jobs:
         id: commit
         run: |
           set -euo pipefail
-          if git diff --quiet -- catalogue; then
-            echo "The catalogue is unchanged."
+          # Only these two files decide. Every beat map carries a `lastVerifiedAt` that moves
+          # on every run by design, so on a six-hourly timer "did any file change" is always
+          # yes and the repository fills with commits that changed nothing anyone can observe.
+          # `catalogueHash` covers every track's content hash and `indexHash` covers every
+          # audio link, so if both are unchanged, no phone can tell this run happened.
+          if git diff --quiet -- catalogue/catalogue.json catalogue/audio.json; then
+            echo "Nothing a phone could see has changed."
+            git checkout -- catalogue
             echo "changed=no" >> "$GITHUB_OUTPUT"
             exit 0
           fi
