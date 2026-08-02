@@ -229,7 +229,7 @@ interface.
 | PV4 | Fewer than 3 usable items remain | "Pick at least 3 items." | Return to media selection |
 | PV5 | Preview could not be built | "We couldn't build a preview. Try a different style." | Return to the gallery |
 | PV6 | Chosen track retired mid-session | "That track isn't available anymore. Here's a similar one." | Auto-swap to the nearest available track within ±4 BPM and rebuild |
-| PV7 | The recording could not be streamed — offline, link expired, link withdrawn, or issued for a different recording | "We couldn't load the track, so you'll hear a click on each beat." *(shown once)* | Fall back to the click. The ruler, the cuts and the export are unaffected |
+| PV7 | The recording could not be streamed — offline, link expired, link withdrawn, or issued for a different recording | "We couldn't load the track, so you'll hear a click on each beat." *(stays for as long as the click is playing — this is a state, not an event, and a message that vanished would leave the user hearing a click with no explanation)* | Fall back to the click. The ruler, the cuts and the export are unaffected |
 
 ---
 
