@@ -76,8 +76,9 @@ jobs:
 
       - name: Give Gradle enough heap for a release build
         # The template ships 2GB, which is fine on a workstation and marginal here. Last
-        # entry in the file wins.
-        run: echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g" >> app/android/gradle.properties
+        # entry in the file wins. The leading newline is not optional: the generated file ends
+        # without one, so a plain append glues this onto `android.targetSdkVersion=35`.
+        run: printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g\n' >> app/android/gradle.properties
 
       - name: Build
         working-directory: app/android

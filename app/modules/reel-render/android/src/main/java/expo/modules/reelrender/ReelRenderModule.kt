@@ -91,7 +91,7 @@ class ReelRenderModule : Module() {
     Events("onProgress")
 
     AsyncFunction("render") Coroutine { cuts: List<Map<String, Any?>>, outputPath: String ->
-      render(cuts, outputPath)
+      runRender(cuts, outputPath)
     }
 
     AsyncFunction("cancel") {
@@ -159,7 +159,7 @@ class ReelRenderModule : Module() {
   // The render itself
   // -------------------------------------------------------------------------
 
-  private suspend fun render(cuts: List<Map<String, Any?>>, outputPath: String): Double =
+  private suspend fun runRender(cuts: List<Map<String, Any?>>, outputPath: String): Double =
     suspendCoroutine { continuation ->
       val context = appContext.reactContext
       if (context == null) {

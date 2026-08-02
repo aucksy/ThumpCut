@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-08-01.
+Last updated: 2026-08-02.
 
 ## Status
 
@@ -12,11 +12,24 @@ Last updated: 2026-08-01.
 | 04 Media selection | ☑ | ☑ | ☐ | Permissions, process death and real photo libraries need a phone. |
 | 05 Preview | ☑ | ☑ | ☐ | Cut list, ruler and click all tested. Playback needs a phone. |
 | 06 Render | ☑ | ☑ | ☐ | Output validation is fully automated. Memory behaviour needs a phone. |
-| 07 Instagram handoff | ☑ | ☑ | ☐ | Needs Instagram installed on a real device. |
+| 07 Instagram handoff | ☑ | ☑ | ☐ | Blocked on a Meta app id. See OPEN-QUESTIONS. |
 | Design system | ☑ | ☑ 18 | ☐ | 40 screen states rendered, measured and screenshotted on every push. |
+| Cloud build | ☑ | — | — | GitHub Actions builds and publishes an installable APK on every push. |
 
 Totals: **474 automated checks** — 151 Python, 323 TypeScript — plus 4 UI gates over 120
 screen-state measurements.
+
+## Getting it onto a phone
+
+`TEST-ON-YOUR-PHONE.md` is the owner-facing version of this. In short:
+
+- Every push to `main` builds a **release APK** — not a development build — and republishes it
+  at <https://github.com/aucksy/ThumpCut/releases/latest>. No laptop, no Expo account, no
+  Android SDK, no Metro.
+- It is signed with the Expo template's debug key, which is byte-identical on every prebuild,
+  so a new build installs over the old one.
+- The song list and beat maps live in `catalogue/` and are served by jsDelivr, pinned to the
+  commit the APK was built from.
 
 ## What can be trusted without a phone
 
@@ -32,45 +45,58 @@ screen-state measurements.
 - The export validator rejects an edit list, a variable frame rate, an audio track, the wrong
   size, the wrong length, and a moov atom in the wrong place.
 
+## Known gaps in the renderer
+
+Both are in the native Android module, both are invisible to every check that can run without a
+phone, and neither is a silent wrong answer — the export validator catches the first.
+
+1. **A clip too short for its slot is not held on its last frame.** The cut engine's "freeze"
+   strategy produces a cut whose duration the renderer cannot yet fill, so the file comes out
+   short and post-export validation rejects it. The user sees the export fail, not a reel that
+   drifts. Reachable only when a clip is far too short for its slot even at the template's
+   slowest speed, so photo-heavy reels never hit it.
+2. **Photos do not drift or zoom.** Ken Burns is in the cut list and in the templates, and is
+   not applied by the renderer. Purely visual; nothing goes out of sync.
+
 ## Awaiting device verification
 
-Each of these is built and unit-tested; none can be honestly ticked without a phone.
+Each of these is built and unit-tested; none can be honestly ticked without a phone. Numbered
+as in `TEST-ON-YOUR-PHONE.md`.
 
-**Needs a mid-range Android phone**
+**Testable now, on the published APK**
 
-1. **Export does not run out of memory** with 30 items including 15 clips totalling 300s. This
-   is the single largest technical risk in the product.
-2. **Export finishes inside 90 seconds** for a 40-cut reel.
-3. **Backgrounding mid-render** continues rather than dying.
-4. **Process death mid-render** leaves no half-written file behind.
-5. **A sideways clip comes out the right way up**, and a landscape clip fills the frame rather
-   than showing bars.
-6. **A variable-frame-rate clip** (most phone video) comes out at constant 30fps.
-7. **The reel plays back in the system gallery** with the picture changing at the same moments
-   it did in the preview.
-8. **Selection survives process death** — Developer Options → "Don't keep activities".
+1. It opens and reaches the song list.
+2. The photo permission prompt is correct.
+3. Refusing permission explains itself and offers settings.
+4. **A 30-item, 15-clip, 300-second export does not run out of memory.** The single largest
+   technical risk in the product.
+5. That export finishes inside 90 seconds.
+6. The progress number actually moves. (Newly implemented — the module declared progress events
+   and never sent one.)
+7. Backgrounding mid-export continues rather than dying.
+8. Cancelling leaves no half-written file behind.
+9. A sideways clip comes out the right way up.
+10. Nothing is letterboxed.
+11. The reel plays in the system gallery with the picture changing at the same moments as in
+    the preview.
+12. The cuts land on the beat.
+13. Selection and export survive "Don't keep activities".
 
-**Needs an iPhone**
+**Blocked on a Meta app id, not on a device**
 
-9. **Limited Photo Library** shows only the permitted photos plus a way to select more.
-10. **An iCloud photo that is not downloaded** either downloads or is skipped with the right
+14. The Instagram button appears at all. It is deliberately absent without an app id.
+15. Share opens Instagram with the video loaded in the Reels composer.
+16. Cancelling inside Instagram and coming back keeps the file and both buttons.
+17. Uninstalling Instagram makes the button disappear.
+18. The cuts still land on the beat once a real track is applied inside Instagram. This is the
+    one that proves the whole product works, and it also needs the real catalogue rather than
+    the three test tracks.
+
+**Needs an iPhone, and an iOS build that does not exist yet**
+
+19. Limited Photo Library shows only the permitted photos plus a way to select more.
+20. An iCloud photo that is not downloaded either downloads or is skipped with the right
     message.
-11. **The Instagram button appears at all** — it depends on `LSApplicationQueriesSchemes`,
-    which cannot be checked without a real build.
-
-**Needs Instagram installed**
-
-12. **Share opens Instagram with the video loaded** in the Reels composer.
-13. **Cancelling inside Instagram and coming back** keeps the file and both buttons.
-14. **Uninstalling Instagram** makes the button disappear rather than grey out.
-15. **The cuts land on the beat** once a track is applied inside Instagram. This is the one
-    that proves the whole product works, and nothing before it can substitute for it.
-
-**Needs a decision, not a device**
-
-16. **Template preview videos.** The gallery is designed around looping previews. There are
-    none yet, so cards show a still or a plain panel — which is the specified fallback, not a
-    bug, but the gallery will not feel finished until real previews exist.
 
 ## What was deliberately not built
 
@@ -83,5 +109,5 @@ Each of these is built and unit-tested; none can be honestly ticked without a ph
 
 ## Current plan
 
-The build is complete against the specs. The next move is a development build on EAS and the
-device checklist above, in that order.
+The device checklist, in order, on the published APK. Then the two renderer gaps above, then
+iOS.
