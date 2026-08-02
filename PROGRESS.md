@@ -16,7 +16,7 @@ Last updated: 2026-08-02.
 | Design system | ☑ | ☑ 18 | ☐ | 40 screen states rendered, measured and screenshotted on every push. |
 | Cloud build | ☑ | ☑ | ☑ | Green. A 44.8 MB signed APK is published and was opened and checked. |
 
-Totals: **488 automated checks** — 163 Python, 325 TypeScript — plus 4 UI gates over 132
+Totals: **511 automated checks** — 164 Python, 347 TypeScript — plus 4 UI gates over 132
 screen-state measurements.
 
 ## The preview plays the real track
@@ -42,7 +42,10 @@ How it works, and what each piece is for:
   why. It is a fallback now, never the default.
 - The playhead comes from the player, not from a clock, so a stalled stream cannot show cuts
   drifting off beats that are exact.
-- The catalogue rebuilds every six hours to keep links fresh, and purges the CDN afterwards.
+- A timer refreshes the links every six hours and purges the CDN afterwards. The timed run
+  republishes **only** the links — it fetches no audio, touches no beat map and cannot retire a
+  track, because re-downloading a few hundred recordings four times a day to answer a question
+  that changes very rarely is not a reasonable thing to do to somebody else's servers.
 - The preview also shows the picture the cut list says belongs at the current moment. Before
   this the stage was a grey rectangle, which is nothing to watch the music land on.
 

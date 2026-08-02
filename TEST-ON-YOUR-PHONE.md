@@ -53,6 +53,12 @@ me a screenshot of the red one.
 
 **Read this before you start, or two of the tests below will look broken when they aren't.**
 
+- **NEW: the preview plays the song.** Until this build it played a click on each beat. Now you
+  should hear the actual music while you watch the pictures cut to it. If the music cannot be
+  fetched — no signal, say — you get the click instead and the screen tells you so in words.
+  This is the main thing to check in this build.
+- **NEW: the preview shows your pictures.** The panel above the beat ruler used to be an empty
+  grey rectangle. It now shows whichever of your photos belongs at that moment.
 - **The songs are fake.** Three test tracks by "ThumpCut Test Kit" at three different speeds.
   They are real audio with real beats, so every timing test below is genuine — but they are
   not Instagram's music. Real songs need one thing from you (see the end of this page).
@@ -89,6 +95,23 @@ Force-stop the app (long-press the icon → App info → Force stop), open it ag
 the same screen, and this time tap **Don't allow**.
 You should get a clear explanation and a button that takes you to the phone's settings — not
 an empty grid and not a crash. Then allow it again and carry on.
+
+### The new one — the preview plays the song
+
+**3a. You can hear the music, and the pictures change on it.**
+Pick a song, pick a style, pick nine or so photos, and watch the preview screen with the volume
+up. You should hear the track playing and see the picture change in time with it. A click for
+the first second or so while it loads is normal — the music should take over on its own without
+jumping back to the start.
+*Wrong if:* you hear nothing at all, or you get clicks the whole way through. If it clicks, the
+screen will say **"We couldn't load the track, so you'll hear a click on each beat."** — tell me
+you saw that line, and whether you were on wifi or mobile data. That message appearing is the
+app working correctly and telling you the truth; it just means the music did not arrive.
+
+**3b. Tapping through styles does not restart the music.**
+Tap four or five different styles in a row. The cutting should change immediately and the song
+should keep playing through it.
+*Wrong if:* the music stops and restarts, or drops to clicks, each time you tap.
 
 ### The big one
 
