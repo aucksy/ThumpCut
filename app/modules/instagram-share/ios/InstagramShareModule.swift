@@ -86,8 +86,11 @@ public class InstagramShareModule: Module {
     /**
      * iOS has no direct equivalent of Android's targeted ACTION_SEND — the system sheet is
      * the platform's own way to hand a file to a named app, so both entry points use it.
+     * The package name still arrives (the JS API is one shape for both platforms); the
+     * sheet simply does not need it.
      */
-    AsyncFunction("shareToPackage") { (videoPath: String, _ packageName: String) in
+    AsyncFunction("shareToPackage") { (videoPath: String, packageName: String) in
+      _ = packageName
       try await Self.presentShareSheet(videoPath: videoPath)
     }
 
